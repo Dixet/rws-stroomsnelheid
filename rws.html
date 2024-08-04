@@ -18,6 +18,35 @@
             document.getElementById('endDate').value = endDate;
             document.getElementById('endTime').value = endTime;
         }
+        function getWindDirection(degrees) {
+            // Define the wind direction abbreviations and their corresponding ranges
+            const directions = [
+                { abbr: "N", min: 337.5, max: 360 },
+                { abbr: "N", min: 0, max: 22.5 },
+                { abbr: "NE", min: 22.5, max: 67.5 },
+                { abbr: "E", min: 67.5, max: 112.5 },
+                { abbr: "SE", min: 112.5, max: 157.5 },
+                { abbr: "S", min: 157.5, max: 202.5 },
+                { abbr: "SW", min: 202.5, max: 247.5 },
+                { abbr: "W", min: 247.5, max: 292.5 },
+                { abbr: "NW", min: 292.5, max: 337.5 }
+            ];
+
+            // Normalize degrees to a range of 0 to 360
+            degrees = degrees % 360;
+            if (degrees < 0) degrees += 360;
+
+            // Find the matching direction
+            for (let i = 0; i < directions.length; i++) {
+                const dir = directions[i];
+                if (degrees >= dir.min && degrees < dir.max) {
+                    return dir.abbr;
+                }
+            }
+
+            // Default to "N" if no match is found (shouldn't happen with current logic)
+            return "N";
+        }
 
         async function fetchData() {
             const startDate = document.getElementById('startDate').value;
@@ -32,23 +61,29 @@
             const StartDateISO = LocalToUTC(localStartDateTimeString);
             const EndDateISO = LocalToUTC(localEndDateTimeString)
 
-            const url = `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+            const url =   `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+            const url_w = `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
 
             try {
+                // get speed information
                 const response = await fetch(url);
                 const data = await response.json();
-                displayResults(data);
+                // get direction information
+                const response_w = await fetch(url_w);
+                const data_w = await response_w.json();
+                displayResults(data, data_w);
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
         }
 
-        function displayResults(data) {
+        function displayResults(data ,data_w) {
             const resultsContainer = document.getElementById('results');
             resultsContainer.innerHTML = '';
 
             if (data.results && data.results.length > 0) {
                 const events = data.results[0].events;
+                const events_w = data_w.results[0].events;
 
                 // Create table
                 const table = document.createElement('table');
@@ -63,10 +98,13 @@
                 timeHeader.textContent = 'Time';
                 const valueHeader = document.createElement('th');
                 valueHeader.textContent = 'Current (cm/s)';
+                const DirectionHeader = document.createElement('th');
+                DirectionHeader.textContent = 'Direction';
 
                 headerRow.appendChild(dateHeader);
                 headerRow.appendChild(timeHeader);
                 headerRow.appendChild(valueHeader);
+                headerRow.appendChild(DirectionHeader);
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
@@ -96,7 +134,9 @@
                 }
 
                 // Populate table rows
+                var i = -1;
                 events.forEach(event => {
+                    i++;
                     if (!event.value) {
                         return;
                     }
@@ -104,6 +144,7 @@
                     const dateCell = document.createElement('td');
                     const timeCell = document.createElement('td');
                     const valueCell = document.createElement('td');
+                    const directionCell = document.createElement('td');
 
                     // Split the timestamp into date and time parts
 					const localTime = UTCToLocal(event.timeStamp);
@@ -115,6 +156,7 @@
                     dateCell.textContent = localDateString;
                     timeCell.textContent = localTimeString;
                     valueCell.textContent = event.value;
+                    directionCell.textContent = events_w[i].value + " (" +  getWindDirection(events_w[i].value) + ")";
 
                     // Apply background color based on value
                     const value = parseFloat(event.value);
@@ -130,6 +172,7 @@
                     row.appendChild(dateCell);
                     row.appendChild(timeCell);
                     row.appendChild(valueCell);
+                    row.appendChild(directionCell);
                     tbody.appendChild(row);
                 });
 
