@@ -157,7 +157,7 @@
                     Date().toLocaleString
                     dateCell.textContent = localDateString;
                     timeCell.textContent = localTimeString;
-                    valueCell.textContent = event.value;
+                    valueCell.textContent = Math.round(event.value * 100);
                     directionCell.textContent = events_w[i].value + " (" +  getWindDirection(events_w[i].value) + ")";
 
                     // Apply background color based on value
