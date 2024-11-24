@@ -164,9 +164,9 @@
                     const value = parseFloat(event.value);
                     if (event.isLowest) {
                         row.style.backgroundColor = '#99ff99'; // darker green
-                    } else if (value > 30) {
+                    } else if (value > 0.30) {
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
-                    } else if (value > 20) {
+                    } else if (value > 0.20) {
                         row.style.backgroundColor = '#ffe6cc'; // light pastel orange
                     } else {
                         row.style.backgroundColor = '#ccffcc'; // light pastel green
