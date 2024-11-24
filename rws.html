@@ -61,8 +61,10 @@
             const StartDateISO = LocalToUTC(localStartDateTimeString);
             const EndDateISO = LocalToUTC(localEndDateTimeString)
 
-            const url =   `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
-            const url_w = `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+//            const url =   `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+            const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?locationCode=${encodeURIComponent(diveSite)}&observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
+            const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+
 
             try {
                 // get speed information
