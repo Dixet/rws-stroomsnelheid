@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Laden...</title>
+  <style>
+    /* Stijl voor het laden-scherm */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #f0f0f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease-out;
+    }
+
+    /* Simpele spinner met CSS animatie */
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid #e0e0e0;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Verberg loader wanneer pagina geladen is */
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Voorbeeld content */
+    #content {
+      display: none;
+    }
+
+    .loaded #content {
+      display: block;
+    }
+
+    .loaded #loader {
+      display: none; /* Of gebruik opacity + transition */
+    }
+  </style>
+</head>
+<body class="loadesd"> <!-- Verwijder 'loaded' om loader te zien -->
+  <!-- Laadscherm -->
+  <div id="loader" class="hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Echte content van de pagina -->
+  <div id="content">
+    <h1>Welkom op de pagina!</h1>
+    <p>De content is geladen.</p>
+  </div>
+
+  <script>
+    // Toon loader tijdens laden, verberg na laden
+    window.addEventListener('DOMContentLoaded', () => {
+      const loader = document.getElementById('loader');
+      loader.classList.add('hidden');
+
+      // Optioneel: wacht even om de animatie te zien
+       setTimeout(() => loader.classList.add('hidden'), 10000);
+    });
+  </script>
+</body>
+</html>
