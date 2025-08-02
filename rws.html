@@ -604,7 +604,7 @@ The dates and times are set to default values of the current date and time, and 
                     const value = parseFloat(event.value);
                     if (event.isLowest) {
                         // Dark green for slack times (minimal current, ideal for diving)
-                        row.style.backgroundColor = '#99ff99'; // darker green
+                        row.style.backgroundColor = '#468046'; // darker green
                     } else if (value > 0.30) {
                         // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
@@ -810,7 +810,7 @@ The dates and times are set to default values of the current date and time, and 
             transition: width 0.3s ease;
         }
         .timeline-segment.speed-30 {
-            background-color: #ffcccc;
+            background-color: #ffe6cc;
         }
         .timeline-segment.speed-20 {
             background-color: #ccffcc;
@@ -845,14 +845,14 @@ The dates and times are set to default values of the current date and time, and 
             align-items: center;
         }
         .tide-indicator {
-            color: #006600;
+            color: #468046;
             font-weight: bold;
-            margin-bottom: 2px;
+            margin-bottom: 2p   x;
             font-size: 0.8em;
             white-space: nowrap;
         }
         .slack-time {
-            color: #006600;
+            color: #468046;
             font-weight: bold;
             background-color: #ffffff;
             padding: 0 4px;
@@ -921,7 +921,7 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #ccffcc;
         }
         .legend .dark-green {
-            background-color: #99ff99;
+            background-color: #468046;
         }
         /* Loading spinner styles */
         .loading-spinner {
