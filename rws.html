@@ -223,6 +223,61 @@ The dates and times are set to default values of the current date and time, and 
                             segment2.className = 'timeline-segment speed-20';
                             const width2 = (getMinutesBetween(window.start20, window.end20) / window.duration) * 100;
                             segment2.style.width = `${width2}%`;
+                            segment2.style.position = 'relative'; // For absolute positioning of slack indicator
+                            
+                            // Find slack tide moment within ≤20 period
+                            const start20Index = events.findIndex(e => e === window.start20);
+                            const end20Index = events.findIndex(e => e === window.end20);
+                            if (start20Index !== -1 && end20Index !== -1) {
+                                // Find the middle of the green period in time
+                                const greenPeriodMinutes = getMinutesBetween(window.start20, window.end20);
+                                const midPointMinutes = greenPeriodMinutes / 2;
+                                let slackFound = false;
+                                let slackTime;
+                                let bestSlackIndex = -1;
+                                let bestTimeDiff = Infinity;
+
+                                // Search around the middle for the direction change
+                                for (let i = start20Index; i < end20Index; i++) {
+                                    const currentDir = parseFloat(events_w[i].value);
+                                    const nextDir = parseFloat(events_w[i + 1].value);
+                                    if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
+                                        // Found a direction change
+                                        const timeFromStart = getMinutesBetween(window.start20, events[i + 1]);
+                                        const timeDiff = Math.abs(timeFromStart - midPointMinutes);
+                                        if (timeDiff < bestTimeDiff) {
+                                            bestTimeDiff = timeDiff;
+                                            bestSlackIndex = i + 1;
+                                        }
+                                    }
+                                }
+
+                                if (bestSlackIndex !== -1) {
+                                    slackTime = events[bestSlackIndex];
+                                    
+                                    // Calculate the relative position of slack time within the green segment
+                                    const slackTimeOffset = (getMinutesBetween(window.start20, slackTime) / getMinutesBetween(window.start20, window.end20)) * 100;
+                                    
+                                    // Create slack indicator
+                                    const slackContainer = document.createElement('div');
+                                    slackContainer.style.position = 'absolute';
+                                    slackContainer.style.left = `${slackTimeOffset}%`;
+                                    slackContainer.style.top = '0';
+                                    slackContainer.style.height = '100%';
+                                    slackContainer.style.transform = 'translateX(-50%)';
+                                    slackContainer.style.width = '2px';
+                                    slackContainer.style.backgroundColor = '#006600';
+                                    slackContainer.style.zIndex = '2';
+
+                                    // Store the slack time and offset for later use in timeline labels
+                                    window.slackTime = slackTime;
+                                    window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
+                                    
+                                    // Add container to segment
+                                    segment2.appendChild(slackContainer);
+                                }
+                            }
+                            
                             timelineBar.appendChild(segment2);
 
                             // Last segment (>20 to ≤30)
@@ -284,6 +339,23 @@ The dates and times are set to default values of the current date and time, and 
 
                     // End of window (>0.3)
                     createLabel(window.end30, barWidth);
+
+                    // Add slack time label if it exists
+                    if (window.slackTime) {
+                        const slackLabelPosition = (window.slackTimeFromStart / window.duration) * barWidth;
+                        const slackLabel = document.createElement('span');
+                        slackLabel.textContent = UTCToLocal(window.slackTime.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                        slackLabel.style.left = `${slackLabelPosition}px`;
+                        slackLabel.style.color = '#006600';
+                        slackLabel.style.fontWeight = 'bold';
+                        slackLabel.className = 'start';
+                        slackLabel.style.backgroundColor = '#ffffff';
+                        slackLabel.style.padding = '0 4px';
+                        timeLabels.appendChild(slackLabel);
+                        // Clean up
+                        delete window.slackTime;
+                        delete window.slackTimeFromStart;
+                    }
 
                     timelineBarContainer.appendChild(timelineBar);
                     timelineBarContainer.appendChild(timeLabels);
