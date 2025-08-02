@@ -171,16 +171,11 @@ The dates and times are set to default values of the current date and time, and 
                     const timelineRow = document.createElement('div');
                     timelineRow.className = 'timeline-row';
                     
-                    // Add date label with tide indicator
+                    // Add date label
                     const dateLabel = document.createElement('div');
                     dateLabel.className = 'timeline-date';
                     const localTime = UTCToLocal(window.windowStart.timeStamp);
                     const localDateString = localTime.toLocaleString().split(', ')[0];
-
-                    // Find the corresponding indices in events_w for window start and end
-                    const startIndex = events.findIndex(e => e === window.windowStart);
-                    const endIndex = events.findIndex(e => e === window.end30);
-                    
                     dateLabel.textContent = localDateString;
                     
                     timelineRow.appendChild(dateLabel);
@@ -255,9 +250,18 @@ The dates and times are set to default values of the current date and time, and 
                                     slackContainer.style.backgroundColor = '#006600';
                                     slackContainer.style.zIndex = '2';
 
-                                    // Store the slack time and offset for later use in timeline labels
+                                    // Store the slack time, offset, and tide indicator for later use
                                     window.slackTime = slackTime;
                                     window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
+                                    
+                                    // Determine tide indicator
+                                    const startDirection = parseFloat(events_w[bestSlackIndex - 1].value);
+                                    const endDirection = parseFloat(events_w[bestSlackIndex].value);
+                                    if (startDirection > 180 && endDirection < 180) {
+                                        window.tideIndicator = 'LW';
+                                    } else if (startDirection < 180 && endDirection > 180) {
+                                        window.tideIndicator = 'HW';
+                                    }
                                     
                                     // Add container to segment
                                     segment2.appendChild(slackContainer);
@@ -328,52 +332,33 @@ The dates and times are set to default values of the current date and time, and 
 
                     // Add slack time label if it exists
                     if (window.slackTime) {
-                        const slackPosition = (window.slackTimeFromStart / window.duration) * barWidth;
+                        const slackLabelPosition = (window.slackTimeFromStart / window.duration) * barWidth;
                         
-                        // Create container for labels
-                        const labelContainer = document.createElement('div');
-                        labelContainer.style.position = 'absolute';
-                        labelContainer.style.left = `${slackPosition}px`;
-                        labelContainer.style.transform = 'translateX(-50%)';
+                        // Create container for slack time and tide indicator
+                        const slackContainer = document.createElement('div');
+                        slackContainer.className = 'slack-container';
+                        slackContainer.style.left = `${slackLabelPosition}px`;
                         
-                        // Add tide indicator (HW/LW)
-                        const tideIndicator = document.createElement('div');
-                        const startDirection = parseFloat(events_w[startIndex].value);
-                        const endDirection = parseFloat(events_w[endIndex].value);
-                        
-                        if (startDirection > 180 && endDirection < 180) {
-                            tideIndicator.textContent = 'LW';
-                        } else if (startDirection < 180 && endDirection > 180) {
-                            tideIndicator.textContent = 'HW';
+                        // Add tide indicator if it exists
+                        if (window.tideIndicator) {
+                            const tideLabel = document.createElement('div');
+                            tideLabel.textContent = window.tideIndicator;
+                            tideLabel.className = 'tide-indicator';
+                            slackContainer.appendChild(tideLabel);
                         }
-                        tideIndicator.style.position = 'absolute';
-                        tideIndicator.style.left = '50%';
-                        tideIndicator.style.transform = 'translate(-50%, 0)';
-                        tideIndicator.style.top = '-20px';
-                        tideIndicator.style.color = '#006600';
-                        tideIndicator.style.fontWeight = 'bold';
-                        tideIndicator.style.backgroundColor = '#ffffff';
-                        tideIndicator.style.padding = '0 4px';
-                        tideIndicator.style.whiteSpace = 'nowrap';
                         
-                        // Add time label
-                        const timeLabel = document.createElement('div');
-                        timeLabel.textContent = UTCToLocal(window.slackTime.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
-                        timeLabel.style.position = 'absolute';
-                        timeLabel.style.left = '50%';
-                        timeLabel.style.transform = 'translate(-50%, 0)';
-                        timeLabel.style.color = '#006600';
-                        timeLabel.style.fontWeight = 'bold';
-                        timeLabel.style.backgroundColor = '#ffffff';
-                        timeLabel.style.padding = '0 4px';
-                        timeLabel.style.whiteSpace = 'nowrap';
+                        // Add slack time
+                        const slackLabel = document.createElement('div');
+                        slackLabel.textContent = UTCToLocal(window.slackTime.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                        slackLabel.className = 'slack-time';
+                        slackContainer.appendChild(slackLabel);
                         
-                        labelContainer.appendChild(tideIndicator);
-                        labelContainer.appendChild(timeLabel);
-                        timeLabels.appendChild(labelContainer);
+                        timeLabels.appendChild(slackContainer);
+                        
                         // Clean up
                         delete window.slackTime;
                         delete window.slackTimeFromStart;
+                        delete window.tideIndicator;
                     }
 
                     timelineBarContainer.appendChild(timelineBar);
@@ -566,28 +551,46 @@ The dates and times are set to default values of the current date and time, and 
         .timeline-labels {
             position: absolute;
             display: flex;
-            top: -22px;  /* Reduced space between time labels and bar */
+            top: -35px;
             width: 100%;
             pointer-events: none;
         }
-        .timeline-labels span, .timeline-labels div {
+        .timeline-labels span {
             font-size: 0.9em;
             position: absolute;
             white-space: nowrap;
-            text-align: center;
-        }
-        .timeline-labels span.start, .timeline-labels div.start {
-            transform: translateX(-50%);
-        }
-        .timeline-labels span.end, .timeline-labels div.end {
+            top: 15px;
             transform: translateX(-50%);
         }
         .timeline-bar-container {
             position: relative;
         }
+        .slack-container {
+            position: absolute;
+            transform: translateX(-50%);
+            text-align: center;
+            min-width: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .tide-indicator {
+            color: #006600;
+            font-weight: bold;
+            margin-bottom: 2px;
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+        .slack-time {
+            color: #006600;
+            font-weight: bold;
+            background-color: #ffffff;
+            padding: 0 4px;
+            white-space: nowrap;
+        }
         .timeline-row {
             position: relative;
-            padding-top: 45px;  /* Increased overall spacing between rows */
+            padding-top: 25px;
         }
         /* Styles for the main table */
         #results table {
