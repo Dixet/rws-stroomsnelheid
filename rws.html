@@ -99,7 +99,7 @@ The dates and times are set to default values of the current date and time, and 
                 displayResults(data, data_w);
             } catch (error) {
                 console.error('Error fetching data:', error);
-                resultsContainer.textContent = 'Error fetching data. Please try again.';
+                resultsContainer.textContent = 'Fout bij het ophalen van gegevens. Probeer het opnieuw.';
             } finally {
                 // Hide loading spinner when done (success or error)
                 loadingSpinner.style.display = 'none';
@@ -123,7 +123,7 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Add header for dive windows section
                 const diveWindowsHeader = document.createElement('h2');
-                diveWindowsHeader.textContent = 'Dive windows';
+                diveWindowsHeader.textContent = 'Duikvensters';
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
                 // Create timeline container
@@ -200,14 +200,44 @@ The dates and times are set to default values of the current date and time, and 
                         const start20Index = events.findIndex(e => e === window.start20);
                         const end20Index = events.findIndex(e => e === window.end20);
                         
-                        // Find slack time
+                        // Find slack time - direction change with lowest water speed
+                        let bestSlackIndex = -1;
+                        let lowestSpeed = Infinity;
+                        
                         for (let i = start20Index; i < end20Index; i++) {
                             const currentDir = parseFloat(events_w[i].value);
                             const nextDir = parseFloat(events_w[i + 1].value);
                             if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
-                                window.slackTime = events[i + 1];
-                                window.slackTimeFromStart = getMinutesBetween(window.windowStart, events[i + 1]);
-                                break;
+                                // Compare speeds at both points and use the lower one
+                                const currentSpeed = parseFloat(events[i].value);
+                                const nextSpeed = parseFloat(events[i + 1].value);
+                                const minSpeed = Math.min(currentSpeed, nextSpeed);
+                                
+                                if (minSpeed < lowestSpeed) {
+                                    lowestSpeed = minSpeed;
+                                    bestSlackIndex = currentSpeed < nextSpeed ? i : i + 1;
+                                }
+                            }
+                        }
+                        
+                        if (bestSlackIndex !== -1) {
+                            window.slackTime = events[bestSlackIndex];
+                            window.slackTimeFromStart = getMinutesBetween(window.windowStart, events[bestSlackIndex]);
+                            
+                            // Determine tide indicator by finding the direction change around bestSlackIndex
+                            let beforeDirection, afterDirection;
+                            if (bestSlackIndex > 0) {
+                                beforeDirection = parseFloat(events_w[bestSlackIndex - 1].value);
+                                afterDirection = parseFloat(events_w[bestSlackIndex].value);
+                            } else {
+                                beforeDirection = parseFloat(events_w[bestSlackIndex].value);
+                                afterDirection = parseFloat(events_w[bestSlackIndex + 1].value);
+                            }
+                            
+                            if (beforeDirection > 180 && afterDirection < 180) {
+                                window.tideIndicator = 'LW';
+                            } else if (beforeDirection < 180 && afterDirection > 180) {
+                                window.tideIndicator = 'HW';
                             }
                         }
                     }
@@ -279,31 +309,28 @@ The dates and times are set to default values of the current date and time, and 
                             const start20Index = events.findIndex(e => e === window.start20);
                             const end20Index = events.findIndex(e => e === window.end20);
                             if (start20Index !== -1 && end20Index !== -1) {
-                                // Find the middle of the green period in time
-                                const greenPeriodMinutes = getMinutesBetween(window.start20, window.end20);
-                                const midPointMinutes = greenPeriodMinutes / 2;
-                                let slackFound = false;
-                                let slackTime;
+                                // Search for the direction change with lowest water speed
                                 let bestSlackIndex = -1;
-                                let bestTimeDiff = Infinity;
+                                let lowestSpeed = Infinity;
 
-                                // Search around the middle for the direction change
                                 for (let i = start20Index; i < end20Index; i++) {
                                     const currentDir = parseFloat(events_w[i].value);
                                     const nextDir = parseFloat(events_w[i + 1].value);
                                     if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
-                                        // Found a direction change
-                                        const timeFromStart = getMinutesBetween(window.start20, events[i + 1]);
-                                        const timeDiff = Math.abs(timeFromStart - midPointMinutes);
-                                        if (timeDiff < bestTimeDiff) {
-                                            bestTimeDiff = timeDiff;
-                                            bestSlackIndex = i + 1;
+                                        // Compare speeds at both points and use the lower one
+                                        const currentSpeed = parseFloat(events[i].value);
+                                        const nextSpeed = parseFloat(events[i + 1].value);
+                                        const minSpeed = Math.min(currentSpeed, nextSpeed);
+                                        
+                                        if (minSpeed < lowestSpeed) {
+                                            lowestSpeed = minSpeed;
+                                            bestSlackIndex = currentSpeed < nextSpeed ? i : i + 1;
                                         }
                                     }
                                 }
 
                                 if (bestSlackIndex !== -1) {
-                                    slackTime = events[bestSlackIndex];
+                                    const slackTime = events[bestSlackIndex];
                                     
                                     // Calculate the relative position of slack time within the green segment
                                     const slackTimeOffset = (getMinutesBetween(window.start20, slackTime) / getMinutesBetween(window.start20, window.end20)) * 100;
@@ -323,12 +350,19 @@ The dates and times are set to default values of the current date and time, and 
                                     window.slackTime = slackTime;
                                     window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
                                     
-                                    // Determine tide indicator
-                                    const startDirection = parseFloat(events_w[bestSlackIndex - 1].value);
-                                    const endDirection = parseFloat(events_w[bestSlackIndex].value);
-                                    if (startDirection > 180 && endDirection < 180) {
+                                    // Determine tide indicator by finding the direction change around bestSlackIndex
+                                    let beforeDirection, afterDirection;
+                                    if (bestSlackIndex > 0) {
+                                        beforeDirection = parseFloat(events_w[bestSlackIndex - 1].value);
+                                        afterDirection = parseFloat(events_w[bestSlackIndex].value);
+                                    } else {
+                                        beforeDirection = parseFloat(events_w[bestSlackIndex].value);
+                                        afterDirection = parseFloat(events_w[bestSlackIndex + 1].value);
+                                    }
+                                    
+                                    if (beforeDirection > 180 && afterDirection < 180) {
                                         window.tideIndicator = 'LW';
-                                    } else if (startDirection < 180 && endDirection > 180) {
+                                    } else if (beforeDirection < 180 && afterDirection > 180) {
                                         window.tideIndicator = 'HW';
                                     }
                                     
@@ -442,7 +476,7 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Add header for current details section
                 const currentDetailsHeader = document.createElement('h2');
-                currentDetailsHeader.textContent = 'Current details';
+                currentDetailsHeader.textContent = 'Stromingsdetails';
                 resultsContainer.appendChild(currentDetailsHeader);
 
                 // Create main table
@@ -453,13 +487,13 @@ The dates and times are set to default values of the current date and time, and 
                 // Create table headers
                 const headerRow = document.createElement('tr');
                 const dateHeader = document.createElement('th');
-                dateHeader.textContent = 'Date';
+                dateHeader.textContent = 'Datum';
                 const timeHeader = document.createElement('th');
-                timeHeader.textContent = 'Time';
+                timeHeader.textContent = 'Tijd';
                 const valueHeader = document.createElement('th');
-                valueHeader.textContent = 'Current (cm/s)';
+                valueHeader.textContent = 'Stroming (cm/s)';
                 const DirectionHeader = document.createElement('th');
-                DirectionHeader.textContent = 'Direction';
+                DirectionHeader.textContent = 'Richting (°)';
 
                 headerRow.appendChild(dateHeader);
                 headerRow.appendChild(timeHeader);
@@ -579,7 +613,7 @@ The dates and times are set to default values of the current date and time, and 
         }
         th {
             background-color: #f2f2f2;
-            text-align: left;
+            text-align: right;
         }
                 h2 {
             margin-top: 20px;
@@ -676,10 +710,31 @@ The dates and times are set to default values of the current date and time, and 
         /* Styles for the main table */
         #results table {
             margin-bottom: 30px;
-            width: 100%;
+            width: auto; /* Allow table to size to content */
+            table-layout: auto; /* Allow columns to size based on content */
         }
         #results td {
-            text-align: center;
+            text-align: right;
+            white-space: nowrap; /* Prevent text wrapping */
+            padding: 8px 12px; /* Add more horizontal padding for better spacing */
+        }
+        #results th {
+            text-align: right;
+            white-space: nowrap;
+            padding: 8px 12px;
+        }
+        /* Specific column widths for optimal sizing */
+        #results th:nth-child(1), #results td:nth-child(1) { /* Datum */
+            width: 90px;
+        }
+        #results th:nth-child(2), #results td:nth-child(2) { /* Tijd */
+            width: 60px;
+        }
+        #results th:nth-child(3), #results td:nth-child(3) { /* Stroming */
+            width: 100px;
+        }
+        #results th:nth-child(4), #results td:nth-child(4) { /* Richting */
+            width: 120px;
         }
         .legend {
             margin-top: 20px;
@@ -747,17 +802,17 @@ The dates and times are set to default values of the current date and time, and 
 <body>
     <h1>Dive site current forecast</h1>
     <form onsubmit="event.preventDefault(); fetchData();">
-        <label for="startDate">Start Date:</label>
+        <label for="startDate">Startdatum:</label>
         <input type="date" id="startDate" required>
-        <label for="startTime">Start Time:</label>
+        <label for="startTime">Start tijd:</label>
         <input type="time" id="startTime" required>
         <br>
-        <label for="endDate">End Date:</label>
+        <label for="endDate">Einddatum:</label>
         <input type="date" id="endDate" required>
-        <label for="endTime">End Time:</label>
+        <label for="endTime">Eind tijd:</label>
         <input type="time" id="endTime" required>
         <br>
-        <label for="diveSite">Dive Site:</label>
+        <label for="diveSite">Duikplaats:</label>
         <select id="diveSite" required>
             <option value="burgd">Burghsluis</option>
             <option value="cpdl">Colijnsplaat</option>
@@ -797,23 +852,23 @@ The dates and times are set to default values of the current date and time, and 
             <option value="zubt">Zuidbout</option>
         </select>
         <br>
-        <button type="submit">Get Data</button>
+        <button type="submit">Toon stroming</button>
     </form>
     
     <div id="loading-spinner" class="loading-spinner">
         <div class="spinner"></div>
-        <div class="loading-text">Loading current data...</div>
+        <div class="loading-text">Stromingsgegevens laden...</div>
     </div>
     
     <div class="legend">
-        <h2>Legend</h2>
-        <div><span class="red"></span> Diving not advised (current > 30 cm/s)</div>
-        <div><span class="orange"></span> Only experienced tidal divers (current 20-30 cm/s)</div>
-        <div><span class="light-green"></span> All tidal divers (current ≤ 20 cm/s)</div>
-        <div><span class="dark-green"></span> Moment of slack tide (hardly any current)</div>
+        <h2>Legenda</h2>
+        <div><span class="red"></span> Duiken afgeraden (stroming > 30 cm/s)</div>
+        <div><span class="orange"></span> Alleen ervaren getijdenduikers (stroming 20-30 cm/s)</div>
+        <div><span class="light-green"></span> Alle getijdenduikers (stroming ≤ 20 cm/s)</div>
+        <div><span class="dark-green"></span> Stromingskentering (vrijwel geen stroming)</div>
     </div>
     <div id="dive-windows"></div>
     <div id="results"></div>
-	<div id="source">Information on this page is retrieved from <a href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat Waterberichtgeving</a> and displayed as is, without any warrantees.<div>
+	<div id="source">De informatie op deze pagina komt van <a href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat Waterberichtgeving</a> en wordt weergegeven zoals deze is, zonder enige garanties.<div>
 </body>
 </html>
