@@ -99,6 +99,12 @@ The dates and times are set to default values of the current date and time, and 
                 const events = data.results[0].events;
                 const events_w = data_w.results[0].events;
 
+                // Helper function to calculate minutes between two timestamps
+                const getMinutesBetween = (start, end) => {
+                    if (!start || !end) return 0;
+                    return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
+                };
+
                 // Add header for dive windows section
                 const diveWindowsHeader = document.createElement('h2');
                 diveWindowsHeader.textContent = 'Dive windows';
@@ -107,12 +113,6 @@ The dates and times are set to default values of the current date and time, and 
                 // Create timeline container
                 const timelineContainer = document.createElement('div');
                 timelineContainer.className = 'timeline-container';
-
-                // Helper function to calculate minutes between two timestamps
-                const getMinutesBetween = (start, end) => {
-                    if (!start || !end) return 0;
-                    return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
-                };
 
                 // First pass: find all windows and determine the longest duration
                 let maxDuration = 0;
@@ -143,86 +143,17 @@ The dates and times are set to default values of the current date and time, and 
                         if (prevValue <= 30 && value > 30) {
                             end30 = events[index - 1];
                             
-                            // If we have a complete window, add it to the timeline
+                            // If we have a complete window, store it
                             if (windowStart) {
-                                const timelineRow = document.createElement('div');
-                                timelineRow.className = 'timeline-row';
-                                
-                                // Add date label
-                                const dateLabel = document.createElement('div');
-                                dateLabel.className = 'timeline-date';
-                                const localTime = UTCToLocal(windowStart.timeStamp);
-                                const localDateString = localTime.toLocaleString().split(', ')[0];
-                                dateLabel.textContent = localDateString;
-                                timelineRow.appendChild(dateLabel);
-
-                                // Create timeline bar container
-                                const timelineBar = document.createElement('div');
-                                timelineBar.className = 'timeline-bar';
-
-                                // Helper function to calculate minutes between two timestamps
-                                const getMinutesBetween = (start, end) => {
-                                    if (!start || !end) return 0;
-                                    return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
-                                };
-
-                                // Calculate total window duration for scaling
-                                const totalDuration = getMinutesBetween(windowStart, end30);
-
-                                // Create segments for different current speeds
-                                if (start20) {
-                                    // First segment (>20 to ≤30)
-                                    const segment1 = document.createElement('div');
-                                    segment1.className = 'timeline-segment speed-30';
-                                    const width1 = (getMinutesBetween(windowStart, start20) / totalDuration) * 100;
-                                    segment1.style.width = `${width1}%`;
-                                    timelineBar.appendChild(segment1);
-
-                                    if (end20) {
-                                        // Middle segment (≤20)
-                                        const segment2 = document.createElement('div');
-                                        segment2.className = 'timeline-segment speed-20';
-                                        const width2 = (getMinutesBetween(start20, end20) / totalDuration) * 100;
-                                        segment2.style.width = `${width2}%`;
-                                        timelineBar.appendChild(segment2);
-
-                                        // Last segment (>20 to ≤30)
-                                        const segment3 = document.createElement('div');
-                                        segment3.className = 'timeline-segment speed-30';
-                                        const width3 = (getMinutesBetween(end20, end30) / totalDuration) * 100;
-                                        segment3.style.width = `${width3}%`;
-                                        timelineBar.appendChild(segment3);
-                                    } else {
-                                        // Remaining segment (≤20)
-                                        const segment2 = document.createElement('div');
-                                        segment2.className = 'timeline-segment speed-20';
-                                        const width2 = (getMinutesBetween(start20, end30) / totalDuration) * 100;
-                                        segment2.style.width = `${width2}%`;
-                                        timelineBar.appendChild(segment2);
-                                    }
-                                } else {
-                                    // Single segment for entire window (≤30)
-                                    const segment = document.createElement('div');
-                                    segment.className = 'timeline-segment speed-30';
-                                    segment.style.width = '100%';
-                                    timelineBar.appendChild(segment);
-                                }
-
-                                timelineRow.appendChild(timelineBar);
-                                
-                                // Add time labels
-                                const timeLabels = document.createElement('div');
-                                timeLabels.className = 'timeline-labels';
-                                [windowStart, start20, end20, end30].forEach(evt => {
-                                    if (evt) {
-                                        const label = document.createElement('span');
-                                        label.textContent = UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
-                                        timeLabels.appendChild(label);
-                                    }
+                                const duration = getMinutesBetween(windowStart, end30);
+                                maxDuration = Math.max(maxDuration, duration);
+                                windows.push({
+                                    windowStart,
+                                    start20,
+                                    end20,
+                                    end30,
+                                    duration
                                 });
-                                timelineRow.appendChild(timeLabels);
-
-                                timelineContainer.appendChild(timelineRow);
                             }
                             
                             // Reset for next window
@@ -233,6 +164,80 @@ The dates and times are set to default values of the current date and time, and 
                         }
                     }
                     prevValue = value;
+                });
+
+                // Second pass: create timeline rows with bars scaled to maxDuration
+                windows.forEach(window => {
+                    const timelineRow = document.createElement('div');
+                    timelineRow.className = 'timeline-row';
+                    
+                    // Add date label
+                    const dateLabel = document.createElement('div');
+                    dateLabel.className = 'timeline-date';
+                    const localTime = UTCToLocal(window.windowStart.timeStamp);
+                    const localDateString = localTime.toLocaleString().split(', ')[0];
+                    dateLabel.textContent = localDateString;
+                    timelineRow.appendChild(dateLabel);
+
+                    // Create timeline bar container
+                    const timelineBar = document.createElement('div');
+                    timelineBar.className = 'timeline-bar';
+                    // Scale the bar width based on its duration relative to maxDuration
+                    timelineBar.style.width = `${(window.duration / maxDuration) * 800}px`;
+
+                    if (window.start20) {
+                        // First segment (>20 to ≤30)
+                        const segment1 = document.createElement('div');
+                        segment1.className = 'timeline-segment speed-30';
+                        const width1 = (getMinutesBetween(window.windowStart, window.start20) / window.duration) * 100;
+                        segment1.style.width = `${width1}%`;
+                        timelineBar.appendChild(segment1);
+
+                        if (window.end20) {
+                            // Middle segment (≤20)
+                            const segment2 = document.createElement('div');
+                            segment2.className = 'timeline-segment speed-20';
+                            const width2 = (getMinutesBetween(window.start20, window.end20) / window.duration) * 100;
+                            segment2.style.width = `${width2}%`;
+                            timelineBar.appendChild(segment2);
+
+                            // Last segment (>20 to ≤30)
+                            const segment3 = document.createElement('div');
+                            segment3.className = 'timeline-segment speed-30';
+                            const width3 = (getMinutesBetween(window.end20, window.end30) / window.duration) * 100;
+                            segment3.style.width = `${width3}%`;
+                            timelineBar.appendChild(segment3);
+                        } else {
+                            // Remaining segment (≤20)
+                            const segment2 = document.createElement('div');
+                            segment2.className = 'timeline-segment speed-20';
+                            const width2 = (getMinutesBetween(window.start20, window.end30) / window.duration) * 100;
+                            segment2.style.width = `${width2}%`;
+                            timelineBar.appendChild(segment2);
+                        }
+                    } else {
+                        // Single segment for entire window (≤30)
+                        const segment = document.createElement('div');
+                        segment.className = 'timeline-segment speed-30';
+                        segment.style.width = '100%';
+                        timelineBar.appendChild(segment);
+                    }
+
+                    timelineRow.appendChild(timelineBar);
+
+                    // Add time labels
+                    const timeLabels = document.createElement('div');
+                    timeLabels.className = 'timeline-labels';
+                    [window.windowStart, window.start20, window.end20, window.end30].forEach(evt => {
+                        if (evt) {
+                            const label = document.createElement('span');
+                            label.textContent = UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                            timeLabels.appendChild(label);
+                        }
+                    });
+                    timelineRow.appendChild(timeLabels);
+
+                    timelineContainer.appendChild(timelineRow);
                 });
 
                 timelineContainer.style.marginBottom = "20px";
@@ -396,11 +401,14 @@ The dates and times are set to default values of the current date and time, and 
             flex-shrink: 0;
         }
         .timeline-bar {
-            flex-grow: 1;
+            width: 800px; /* Base width for the longest duration */
             height: 30px;
             display: flex;
             border-radius: 4px;
             overflow: hidden;
+            margin-right: 20px;
+            border: 1px solid #ddd;
+            flex-shrink: 1;
         }
         .timeline-segment {
             height: 100%;
