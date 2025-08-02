@@ -143,17 +143,29 @@ The dates and times are set to default values of the current date and time, and 
                         if (prevValue <= 30 && value > 30) {
                             end30 = events[index - 1];
                             
-                            // If we have a complete window, store it
+                            // If we have a complete window, check if it's a valid tide window
                             if (windowStart) {
-                                const duration = getMinutesBetween(windowStart, end30);
-                                maxDuration = Math.max(maxDuration, duration);
-                                windows.push({
-                                    windowStart,
-                                    start20,
-                                    end20,
-                                    end30,
-                                    duration
-                                });
+                                const windowStartIndex = events.findIndex(e => e === windowStart);
+                                const windowEndIndex = events.findIndex(e => e === end30);
+                                
+                                if (windowStartIndex !== -1 && windowEndIndex !== -1) {
+                                    const startDirection = parseFloat(events_w[windowStartIndex].value);
+                                    const endDirection = parseFloat(events_w[windowEndIndex].value);
+                                    
+                                    // Only store the window if there's a direction change (one value above 180, one below)
+                                    if ((startDirection > 180 && endDirection < 180) || 
+                                        (startDirection < 180 && endDirection > 180)) {
+                                        const duration = getMinutesBetween(windowStart, end30);
+                                        maxDuration = Math.max(maxDuration, duration);
+                                        windows.push({
+                                            windowStart,
+                                            start20,
+                                            end20,
+                                            end30,
+                                            duration
+                                        });
+                                    }
+                                }
                             }
                             
                             // Reset for next window
