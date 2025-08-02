@@ -54,7 +54,7 @@
     }
   </style>
 </head>
-<body class="loadesd"> <!-- Verwijder 'loaded' om loader te zien -->
+<body > <!-- Verwijder 'loaded' om loader te zien -->
   <!-- Laadscherm -->
   <div id="loader" class="hidden">
     <div class="spinner"></div>
@@ -70,7 +70,7 @@
     // Toon loader tijdens laden, verberg na laden
     window.addEventListener('DOMContentLoaded', () => {
       const loader = document.getElementById('loader');
-      loader.classList.add('hidden');
+      //loader.classList.add('hidden');
 
       // Optioneel: wacht even om de animatie te zien
        setTimeout(() => loader.classList.add('hidden'), 10000);

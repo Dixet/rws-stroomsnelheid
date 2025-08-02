@@ -571,6 +571,7 @@ The dates and times are set to default values of the current date and time, and 
             width: 100%;
             padding: 20px 0;
             position: relative;
+            padding-left: 150px; /* Space for date labels */
         }
         .timeline-row {
             display: flex;
@@ -578,13 +579,14 @@ The dates and times are set to default values of the current date and time, and 
             margin-bottom: 30px;
             overflow: visible;
             position: relative; /* Ensure proper positioning context */
-            padding-left: 120px; /* Space for date labels */
         }
         .timeline-date {
             position: absolute;
             left: 0;
-            width: 100px;
+            width: 130px;
             padding-top: 5px;
+            text-align: left;
+            transform: translateX(-150px); /* Move date label to the left */
         }
         .timeline-bar {
             width: 800px; /* Base width for the longest duration */
@@ -620,9 +622,10 @@ The dates and times are set to default values of the current date and time, and 
             transform: translateX(-50%);
         }
         .timeline-bar-container {
-            position: relative;
-            margin-left: 20px; /* Add extra space after the date label */
-            padding-left: 140px; /* Additional padding for visual separation */
+            position: absolute;
+            display: flex;
+            left: 150px; /* Position right after the date label (130px width + 20px gap) */
+            min-width: 0; /* Prevent container from growing beyond parent width */
         }
         .slack-container {
             position: absolute;
