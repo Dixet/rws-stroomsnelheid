@@ -85,9 +85,11 @@ The dates and times are set to default values of the current date and time, and 
             const EndDateISO = LocalToUTC(localEndDateTimeString)
 
 //            const url =   `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+            // Use the RWS API to fetch data for the selected dive site and time range
+            // Note: The observationTypeId and sourceName are hardcoded based on the API documentation 
+            // url is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
             const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?locationCode=${encodeURIComponent(diveSite)}&observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
             const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
-
 
             try {
                 // get speed information
@@ -112,7 +114,10 @@ The dates and times are set to default values of the current date and time, and 
             const legend = document.querySelector('.legend');
 
             if (data.results && data.results.length > 0) {
+                // events contains all water speed data in 10 minute increments 
                 const events = data.results[0].events;
+                // events_w contains all water direction data in 10 minute increments
+                // Note: this is the same time series as events, but with different values
                 const events_w = data_w.results[0].events;
 
                 // Helper function to calculate minutes between two timestamps
@@ -502,30 +507,26 @@ The dates and times are set to default values of the current date and time, and 
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Find the lowest values in each sequence of values below 20
-                let lowestValue = null;
-                let lowestValueIndex = -1;
-
+                // Find slack times based on direction changes with lowest water speed
                 events.forEach((event, index) => {
-                    const value = parseFloat(event.value);
-                    if (value < 20) {
-                        if (lowestValue === null || value < lowestValue) {
-                            lowestValue = value;
-                            lowestValueIndex = index;
+                    if (index < events.length - 1) {
+                        const currentDir = parseFloat(events_w[index].value);
+                        const nextDir = parseFloat(events_w[index + 1].value);
+                        
+                        // Check for direction change
+                        if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
+                            // Compare speeds at both points and mark the one with lower speed as slack
+                            const currentSpeed = parseFloat(events[index].value);
+                            const nextSpeed = parseFloat(events[index + 1].value);
+                            
+                            if (currentSpeed < nextSpeed) {
+                                events[index].isLowest = true;
+                            } else {
+                                events[index + 1].isLowest = true;
+                            }
                         }
-                    } else {
-                        if (lowestValue !== null) {
-                            events[lowestValueIndex].isLowest = true;
-                        }
-                        lowestValue = null;
-                        lowestValueIndex = -1;
                     }
                 });
-
-                // Check the last sequence
-                if (lowestValue !== null) {
-                    events[lowestValueIndex].isLowest = true;
-                }
 
                 // Populate table rows
                 var i = -1;
