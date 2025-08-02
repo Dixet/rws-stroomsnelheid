@@ -1,3 +1,13 @@
+<!-- 
+Page to show the current forecast for a dive site in Zeeland, Netherlands.
+This page fetches data from the Rijkswaterstaat Waterberichtgeving API and displays it in a table format.
+The data includes current speed and direction, with color coding based on the current speed. 
+
+The page also includes a legend to explain the color coding.
+The user can select a dive site and specify a time range to get the forecast data.  
+The selection of dive sites is based on the available data from the Rijkswaterstaat API.
+The dates and times are set to default values of the current date and time, and two days later for the end date and time.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,7 +97,110 @@
                 const events = data.results[0].events;
                 const events_w = data_w.results[0].events;
 
-                // Create table
+                // Create diving windows summary table
+                const summaryTable = document.createElement('table');
+                const summaryThead = document.createElement('thead');
+                const summaryTbody = document.createElement('tbody');
+
+                // Create summary table headers
+                const summaryHeaderRow = document.createElement('tr');
+                ['Date', 'Starts ≤30cm/s', 'Starts ≤20cm/s', 'Ends ≤20cm/s', 'Ends ≤30cm/s'].forEach(headerText => {
+                    const header = document.createElement('th');
+                    header.textContent = headerText;
+                    summaryHeaderRow.appendChild(header);
+                });
+                summaryThead.appendChild(summaryHeaderRow);
+                summaryTable.appendChild(summaryThead);
+
+                // Find diving windows
+                let windowStart = null;
+                let start20 = null;
+                let end20 = null;
+                let end30 = null;
+                let prevValue = null;
+
+                events.forEach((event, index) => {
+                    const value = parseFloat(event.value) * 100; // Convert to cm/s
+                    
+                    if (prevValue !== null) {
+                        // Detect start of window (crossing below 0.3)
+                        if (prevValue > 30 && value <= 30) {
+                            windowStart = event;
+                        }
+                        // Detect crossing below 0.2
+                        if (prevValue > 20 && value <= 20) {
+                            start20 = event;
+                        }
+                        // Detect crossing above 0.2
+                        if (prevValue <= 20 && value > 20) {
+                            end20 = events[index - 1];
+                        }
+                        // Detect crossing above 0.3 (end of window)
+                        if (prevValue <= 30 && value > 30) {
+                            end30 = events[index - 1];
+                            
+                            // If we have a complete window, add it to the table
+                            if (windowStart) {
+                                const row = document.createElement('tr');
+                                
+                                // Helper function to format date/time
+                                const formatDateTime = (evt) => {
+                                    if (!evt) return '-';
+                                    const localTime = UTCToLocal(evt.timeStamp);
+                                    const localDateTimeString = localTime.toLocaleString();
+                                    return localDateTimeString.split(', ')[1].substring(0,5);
+                                };
+                                
+                                // Add date (from window start)
+                                const dateCell = document.createElement('td');
+                                const localTime = UTCToLocal(windowStart.timeStamp);
+                                const localDateString = localTime.toLocaleString().split(', ')[0];
+                                dateCell.textContent = localDateString;
+                                row.appendChild(dateCell);
+                                
+                                // Add times
+                                [windowStart, start20, end20, end30].forEach(evt => {
+                                    const cell = document.createElement('td');
+                                    cell.textContent = formatDateTime(evt);
+                                    row.appendChild(cell);
+                                });
+                                
+                                summaryTbody.appendChild(row);
+                            }
+                            
+                            // Reset for next window
+                            windowStart = null;
+                            start20 = null;
+                            end20 = null;
+                            end30 = null;
+                        }
+                    }
+                    prevValue = value;
+                });
+
+                // Check if we have an incomplete window at the end of the data
+                if (windowStart) {
+                    const row = document.createElement('tr');
+                    const dateCell = document.createElement('td');
+                    const localTime = UTCToLocal(windowStart.timeStamp);
+                    const localDateString = localTime.toLocaleString().split(', ')[0];
+                    dateCell.textContent = localDateString;
+                    row.appendChild(dateCell);
+                    
+                    [windowStart, start20, end20, end30].forEach(evt => {
+                        const cell = document.createElement('td');
+                        cell.textContent = evt ? UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5) : '-';
+                        row.appendChild(cell);
+                    });
+                    
+                    summaryTbody.appendChild(row);
+                }
+
+                summaryTable.appendChild(summaryTbody);
+                summaryTable.style.marginBottom = "20px";
+                resultsContainer.appendChild(summaryTable);
+
+                // Create main table
                 const table = document.createElement('table');
                 const thead = document.createElement('thead');
                 const tbody = document.createElement('tbody');
@@ -219,6 +332,17 @@
         th {
             background-color: #f2f2f2;
             text-align: left;
+        }
+        /* Styles for the summary table */
+        #results table:first-child {
+            margin-bottom: 30px;
+        }
+        #results table:first-child th {
+            background-color: #e6ffe6;
+            text-align: center;
+        }
+        #results table:first-child td {
+            text-align: center;
         }
         .legend {
             margin-top: 20px;
