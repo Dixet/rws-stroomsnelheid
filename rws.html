@@ -761,7 +761,14 @@ The dates and times are set to default values of the current date and time, and 
 			.form-row {
 				flex-direction: column;
 				gap: 15px;
+				align-items: flex-start; /* Align form groups to the left */
 			}
+			
+			.form-group {
+				align-items: flex-start; /* Align form group contents to the left */
+				width: 100%; /* Ensure form groups take full width */
+			}
+			
 			form {
 				margin: 0 10px 20px 10px;
 				padding: 20px;
@@ -772,6 +779,15 @@ The dates and times are set to default values of the current date and time, and 
 			h1 {
 				font-size: 1.5em;
 				text-align: center;
+			}
+			
+			/* Ensure form elements are left-aligned on smaller screens */
+			label {
+				text-align: left;
+			}
+			
+			input[type="date"], input[type="time"], select {
+				text-align: left;
 			}
 		}
 		/* Additional responsive styles for tablets */
@@ -1004,9 +1020,27 @@ The dates and times are set to default values of the current date and time, and 
 				font-size: 1.1em;
 			}
 			
+			.form-row {
+				align-items: flex-start; /* Align form groups to the left */
+			}
+			
+			.form-group {
+				align-items: flex-start; /* Align form group contents to the left */
+				width: 100%; /* Ensure form groups take full width */
+			}
+			
 			form {
 				padding: 15px;
 				margin: 0 5px 15px 5px;
+			}
+			
+			/* Ensure form elements are left-aligned on mobile */
+			label {
+				text-align: left;
+			}
+			
+			input[type="date"], input[type="time"], select {
+				text-align: left;
 			}
 			
 			/* Timeline adjustments for mobile */
