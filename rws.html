@@ -171,12 +171,32 @@ The dates and times are set to default values of the current date and time, and 
                     const timelineRow = document.createElement('div');
                     timelineRow.className = 'timeline-row';
                     
-                    // Add date label
+                    // Add date label with tide indicator
                     const dateLabel = document.createElement('div');
                     dateLabel.className = 'timeline-date';
                     const localTime = UTCToLocal(window.windowStart.timeStamp);
                     const localDateString = localTime.toLocaleString().split(', ')[0];
-                    dateLabel.textContent = localDateString;
+
+                    // Find the corresponding indices in events_w for window start and end
+                    const startIndex = events.findIndex(e => e === window.windowStart);
+                    const endIndex = events.findIndex(e => e === window.end30);
+                    
+                    if (startIndex !== -1 && endIndex !== -1) {
+                        const startDirection = parseFloat(events_w[startIndex].value);
+                        const endDirection = parseFloat(events_w[endIndex].value);
+                        
+                        let tideIndicator = '';
+                        if (startDirection > 180 && endDirection < 180) {
+                            tideIndicator = ' LW';
+                        } else if (startDirection < 180 && endDirection > 180) {
+                            tideIndicator = ' HW';
+                        }
+                        
+                        dateLabel.textContent = localDateString + tideIndicator;
+                    } else {
+                        dateLabel.textContent = localDateString;
+                    }
+                    
                     timelineRow.appendChild(dateLabel);
 
                     // Create container for the bar and labels
