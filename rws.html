@@ -179,11 +179,15 @@ The dates and times are set to default values of the current date and time, and 
                     dateLabel.textContent = localDateString;
                     timelineRow.appendChild(dateLabel);
 
-                    // Create timeline bar container
+                    // Create container for the bar and labels
+                    const timelineBarContainer = document.createElement('div');
+                    timelineBarContainer.className = 'timeline-bar-container';
+
+                    // Create timeline bar
                     const timelineBar = document.createElement('div');
                     timelineBar.className = 'timeline-bar';
-                    // Scale the bar width based on its duration relative to maxDuration
-                    timelineBar.style.width = `${(window.duration / maxDuration) * 800}px`;
+                    const barWidth = (window.duration / maxDuration) * 800;
+                    timelineBar.style.width = `${barWidth}px`;
 
                     if (window.start20) {
                         // First segment (>20 to ≤30)
@@ -228,15 +232,43 @@ The dates and times are set to default values of the current date and time, and 
                     // Add time labels
                     const timeLabels = document.createElement('div');
                     timeLabels.className = 'timeline-labels';
-                    [window.windowStart, window.start20, window.end20, window.end30].forEach(evt => {
+
+                    // Helper function to create positioned label
+                    const createLabel = (evt, position) => {
                         if (evt) {
                             const label = document.createElement('span');
                             label.textContent = UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                            label.style.left = `${position}px`;
+                            label.className = 'start';
                             timeLabels.appendChild(label);
                         }
-                    });
-                    timelineRow.appendChild(timeLabels);
+                    };
 
+                    // Calculate pixel positions for labels based on the actual bar width
+                    let currentPosition = 0;
+                    
+                    // Start of window (<=0.3)
+                    createLabel(window.windowStart, 0);
+
+                    if (window.start20) {
+                        // Time when <=0.2 starts
+                        const start20Pixels = (getMinutesBetween(window.windowStart, window.start20) / window.duration) * barWidth;
+                        createLabel(window.start20, start20Pixels);
+
+                        if (window.end20) {
+                            // Time when >0.2 starts
+                            const end20Pixels = (getMinutesBetween(window.windowStart, window.end20) / window.duration) * barWidth;
+                            createLabel(window.end20, end20Pixels);
+                        }
+                    }
+
+                    // End of window (>0.3)
+                    createLabel(window.end30, barWidth);
+
+                    timelineBarContainer.appendChild(timelineBar);
+                    timelineBarContainer.appendChild(timeLabels);
+                    timelineRow.appendChild(timelineBarContainer);
+                    
                     timelineContainer.appendChild(timelineRow);
                 });
 
@@ -421,14 +453,29 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #ccffcc;
         }
         .timeline-labels {
-            width: 300px;
-            flex-shrink: 0;
+            position: absolute;
             display: flex;
-            justify-content: space-between;
-            padding-left: 20px;
+            top: -20px;
+            width: 100%;
+            pointer-events: none;
         }
         .timeline-labels span {
             font-size: 0.9em;
+            position: absolute;
+            white-space: nowrap;
+        }
+        .timeline-labels span.start {
+            transform: translateX(-50%);
+        }
+        .timeline-labels span.end {
+            transform: translateX(-50%);
+        }
+        .timeline-bar-container {
+            position: relative;
+        }
+        .timeline-row {
+            position: relative;
+            padding-top: 25px;
         }
         /* Styles for the main table */
         #results table {
