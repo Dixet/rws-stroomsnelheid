@@ -29,33 +29,12 @@ The dates and times are set to default values of the current date and time, and 
             document.getElementById('endTime').value = endTime;
         }
         function getWindDirection(degrees) {
-            // Define the wind direction abbreviations and their corresponding ranges
-            const directions = [
-                { abbr: "N", min: 337.5, max: 360 },
-                { abbr: "N", min: 0, max: 22.5 },
-                { abbr: "NE", min: 22.5, max: 67.5 },
-                { abbr: "E", min: 67.5, max: 112.5 },
-                { abbr: "SE", min: 112.5, max: 157.5 },
-                { abbr: "S", min: 157.5, max: 202.5 },
-                { abbr: "SW", min: 202.5, max: 247.5 },
-                { abbr: "W", min: 247.5, max: 292.5 },
-                { abbr: "NW", min: 292.5, max: 337.5 }
-            ];
-
             // Normalize degrees to a range of 0 to 360
-            degrees = degrees % 360;
-            if (degrees < 0) degrees += 360;
-
-            // Find the matching direction
-            for (let i = 0; i < directions.length; i++) {
-                const dir = directions[i];
-                if (degrees >= dir.min && degrees < dir.max) {
-                    return dir.abbr;
-                }
-            }
-
-            // Default to "N" if no match is found (shouldn't happen with current logic)
-            return "N";
+            degrees = ((degrees % 360) + 360) % 360;
+            
+            // Use array index calculation instead of loop
+            const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+            return directions[Math.round(degrees / 45) % 8];
         }
 
         async function fetchData() {
@@ -82,9 +61,8 @@ The dates and times are set to default values of the current date and time, and 
             const localEndDateTimeString = `${endDate}T${endTime}:00`;
 
             const StartDateISO = LocalToUTC(localStartDateTimeString);
-            const EndDateISO = LocalToUTC(localEndDateTimeString)
+            const EndDateISO = LocalToUTC(localEndDateTimeString);
 
-//            const url =   `https://waterberichtgeving.rws.nl/wb/data/api/dd/2.0/timeseries?observationTypeId=SG.1&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
             // Use the RWS API to fetch data for the selected dive site and time range
             // Note: The observationTypeId and sourceName are hardcoded based on the API documentation 
             // url is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
@@ -120,10 +98,67 @@ The dates and times are set to default values of the current date and time, and 
                 // Note: this is the same time series as events, but with different values
                 const events_w = data_w.results[0].events;
 
-                // Helper function to calculate minutes between two timestamps
+                // Helper functions
                 const getMinutesBetween = (start, end) => {
                     if (!start || !end) return 0;
                     return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
+                };
+
+                const isDirectionChange = (dir1, dir2) => (dir1 > 180 && dir2 < 180) || (dir1 < 180 && dir2 > 180);
+
+                const formatTime = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0,5);
+
+                const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
+
+                // Pre-calculate all slack times once
+                const slackTimes = new Set();
+                events.forEach((event, index) => {
+                    if (index < events.length - 1) {
+                        const currentDir = parseFloat(events_w[index].value);
+                        const nextDir = parseFloat(events_w[index + 1].value);
+                        
+                        if (isDirectionChange(currentDir, nextDir)) {
+                            const currentSpeed = parseFloat(events[index].value);
+                            const nextSpeed = parseFloat(events[index + 1].value);
+                            
+                            if (currentSpeed < nextSpeed) {
+                                events[index].isLowest = true;
+                                slackTimes.add(index);
+                            } else {
+                                events[index + 1].isLowest = true;
+                                slackTimes.add(index + 1);
+                            }
+                        }
+                    }
+                });
+
+                const findSlackInRange = (startIndex, endIndex) => {
+                    let bestSlackIndex = -1;
+                    let lowestSpeed = Infinity;
+                    
+                    for (let i = startIndex; i < endIndex; i++) {
+                        if (slackTimes.has(i)) {
+                            const speed = parseFloat(events[i].value);
+                            if (speed < lowestSpeed) {
+                                lowestSpeed = speed;
+                                bestSlackIndex = i;
+                            }
+                        }
+                    }
+                    return bestSlackIndex;
+                };
+
+                const getTideIndicator = (slackIndex) => {
+                    const beforeDirection = slackIndex > 0 ? 
+                        parseFloat(events_w[slackIndex - 1].value) : 
+                        parseFloat(events_w[slackIndex].value);
+                    const afterDirection = slackIndex < events_w.length - 1 ? 
+                        parseFloat(events_w[slackIndex + 1].value) : 
+                        parseFloat(events_w[slackIndex].value);
+                    
+                    if (beforeDirection > 180 && afterDirection < 180) return 'LW';
+                    if (beforeDirection < 180 && afterDirection > 180) return 'HW';
+                    return '';
                 };
 
                 // Add header for dive windows section
@@ -205,63 +240,18 @@ The dates and times are set to default values of the current date and time, and 
                         const start20Index = events.findIndex(e => e === window.start20);
                         const end20Index = events.findIndex(e => e === window.end20);
                         
-                        // Find slack time - direction change with lowest water speed
-                        let bestSlackIndex = -1;
-                        let lowestSpeed = Infinity;
-                        
-                        for (let i = start20Index; i < end20Index; i++) {
-                            const currentDir = parseFloat(events_w[i].value);
-                            const nextDir = parseFloat(events_w[i + 1].value);
-                            if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
-                                // Compare speeds at both points and use the lower one
-                                const currentSpeed = parseFloat(events[i].value);
-                                const nextSpeed = parseFloat(events[i + 1].value);
-                                const minSpeed = Math.min(currentSpeed, nextSpeed);
-                                
-                                if (minSpeed < lowestSpeed) {
-                                    lowestSpeed = minSpeed;
-                                    bestSlackIndex = currentSpeed < nextSpeed ? i : i + 1;
-                                }
-                            }
-                        }
+                        const bestSlackIndex = findSlackInRange(start20Index, end20Index);
                         
                         if (bestSlackIndex !== -1) {
                             window.slackTime = events[bestSlackIndex];
                             window.slackTimeFromStart = getMinutesBetween(window.windowStart, events[bestSlackIndex]);
-                            
-                            // Determine tide indicator by finding the direction change around bestSlackIndex
-                            let beforeDirection, afterDirection;
-                            if (bestSlackIndex > 0) {
-                                beforeDirection = parseFloat(events_w[bestSlackIndex - 1].value);
-                                afterDirection = parseFloat(events_w[bestSlackIndex].value);
-                            } else {
-                                beforeDirection = parseFloat(events_w[bestSlackIndex].value);
-                                afterDirection = parseFloat(events_w[bestSlackIndex + 1].value);
-                            }
-                            
-                            if (beforeDirection > 180 && afterDirection < 180) {
-                                window.tideIndicator = 'LW';
-                            } else if (beforeDirection < 180 && afterDirection > 180) {
-                                window.tideIndicator = 'HW';
-                            }
+                            window.tideIndicator = getTideIndicator(bestSlackIndex);
                         }
                     }
                 });
 
                 // Calculate slack times and find the maximum offset needed
-                let maxLeftOffset = 0;
-                let maxRightOffset = 0;
                 let referencePoint = 400; // Center point for alignment (half of 800px max width)
-                
-                // First pass: calculate all offsets
-                windows.forEach(window => {
-                    if (window.slackTime) {
-                        const slackTimeFromStart = window.slackTimeFromStart;
-                        const timeFromSlackToEnd = getMinutesBetween(window.slackTime, window.end30);
-                        maxLeftOffset = Math.max(maxLeftOffset, slackTimeFromStart);
-                        maxRightOffset = Math.max(maxRightOffset, timeFromSlackToEnd);
-                    }
-                });
                 
                 // Second pass: create timeline rows with bars scaled to maxDuration
                 windows.forEach(window => {
@@ -271,9 +261,7 @@ The dates and times are set to default values of the current date and time, and 
                     // Add date label
                     const dateLabel = document.createElement('div');
                     dateLabel.className = 'timeline-date';
-                    const localTime = UTCToLocal(window.windowStart.timeStamp);
-                    const localDateString = localTime.toLocaleString().split(', ')[0];
-                    dateLabel.textContent = localDateString;
+                    dateLabel.textContent = formatDate(window.windowStart.timeStamp);
                     
                     timelineRow.appendChild(dateLabel);
 
@@ -314,25 +302,7 @@ The dates and times are set to default values of the current date and time, and 
                             const start20Index = events.findIndex(e => e === window.start20);
                             const end20Index = events.findIndex(e => e === window.end20);
                             if (start20Index !== -1 && end20Index !== -1) {
-                                // Search for the direction change with lowest water speed
-                                let bestSlackIndex = -1;
-                                let lowestSpeed = Infinity;
-
-                                for (let i = start20Index; i < end20Index; i++) {
-                                    const currentDir = parseFloat(events_w[i].value);
-                                    const nextDir = parseFloat(events_w[i + 1].value);
-                                    if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
-                                        // Compare speeds at both points and use the lower one
-                                        const currentSpeed = parseFloat(events[i].value);
-                                        const nextSpeed = parseFloat(events[i + 1].value);
-                                        const minSpeed = Math.min(currentSpeed, nextSpeed);
-                                        
-                                        if (minSpeed < lowestSpeed) {
-                                            lowestSpeed = minSpeed;
-                                            bestSlackIndex = currentSpeed < nextSpeed ? i : i + 1;
-                                        }
-                                    }
-                                }
+                                const bestSlackIndex = findSlackInRange(start20Index, end20Index);
 
                                 if (bestSlackIndex !== -1) {
                                     const slackTime = events[bestSlackIndex];
@@ -354,22 +324,7 @@ The dates and times are set to default values of the current date and time, and 
                                     // Store the slack time, offset, and tide indicator for later use
                                     window.slackTime = slackTime;
                                     window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
-                                    
-                                    // Determine tide indicator by finding the direction change around bestSlackIndex
-                                    let beforeDirection, afterDirection;
-                                    if (bestSlackIndex > 0) {
-                                        beforeDirection = parseFloat(events_w[bestSlackIndex - 1].value);
-                                        afterDirection = parseFloat(events_w[bestSlackIndex].value);
-                                    } else {
-                                        beforeDirection = parseFloat(events_w[bestSlackIndex].value);
-                                        afterDirection = parseFloat(events_w[bestSlackIndex + 1].value);
-                                    }
-                                    
-                                    if (beforeDirection > 180 && afterDirection < 180) {
-                                        window.tideIndicator = 'LW';
-                                    } else if (beforeDirection < 180 && afterDirection > 180) {
-                                        window.tideIndicator = 'HW';
-                                    }
+                                    window.tideIndicator = getTideIndicator(bestSlackIndex);
                                     
                                     // Add container to segment
                                     segment2.appendChild(slackContainer);
@@ -410,7 +365,7 @@ The dates and times are set to default values of the current date and time, and 
                     const createLabel = (evt, position) => {
                         if (evt) {
                             const label = document.createElement('span');
-                            label.textContent = UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                            label.textContent = formatTime(evt.timeStamp);
                             label.style.left = `${position}px`;
                             label.className = 'start';
                             timeLabels.appendChild(label);
@@ -457,7 +412,7 @@ The dates and times are set to default values of the current date and time, and 
                         
                         // Add slack time
                         const slackLabel = document.createElement('div');
-                        slackLabel.textContent = UTCToLocal(window.slackTime.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                        slackLabel.textContent = formatTime(window.slackTime.timeStamp);
                         slackLabel.className = 'slack-time';
                         slackContainer.appendChild(slackLabel);
                         
@@ -527,51 +482,20 @@ The dates and times are set to default values of the current date and time, and 
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Find slack times based on direction changes with lowest water speed
+                // Populate table rows (slack times already calculated)
                 events.forEach((event, index) => {
-                    if (index < events.length - 1) {
-                        const currentDir = parseFloat(events_w[index].value);
-                        const nextDir = parseFloat(events_w[index + 1].value);
-                        
-                        // Check for direction change
-                        if ((currentDir > 180 && nextDir < 180) || (currentDir < 180 && nextDir > 180)) {
-                            // Compare speeds at both points and mark the one with lower speed as slack
-                            const currentSpeed = parseFloat(events[index].value);
-                            const nextSpeed = parseFloat(events[index + 1].value);
-                            
-                            if (currentSpeed < nextSpeed) {
-                                events[index].isLowest = true;
-                            } else {
-                                events[index + 1].isLowest = true;
-                            }
-                        }
-                    }
-                });
-
-                // Populate table rows
-                var i = -1;
-                events.forEach(event => {
-                    i++;
-                    if (!event.value) {
-                        return;
-                    }
+                    if (!event.value) return;
+                    
                     const row = document.createElement('tr');
                     const dateCell = document.createElement('td');
                     const timeCell = document.createElement('td');
                     const valueCell = document.createElement('td');
                     const directionCell = document.createElement('td');
 
-                    // Split the timestamp into date and time parts
-					const localTime = UTCToLocal(event.timeStamp);
-                    const localDateTimeString = localTime.toLocaleString();
-                    const localDateString = localDateTimeString.split(', ')[0];
-                    const localTimeString = localDateTimeString.split(', ')[1].substring(0,5);
-                    
-                    Date().toLocaleString
-                    dateCell.textContent = localDateString;
-                    timeCell.textContent = localTimeString;
+                    dateCell.textContent = formatDate(event.timeStamp);
+                    timeCell.textContent = formatTime(event.timeStamp);
                     valueCell.textContent = Math.round(event.value * 100);
-                    directionCell.textContent = events_w[i].value + " (" +  getWindDirection(events_w[i].value) + ")";
+                    directionCell.textContent = events_w[index].value + " (" + getWindDirection(events_w[index].value) + ")";
 
                     // Apply background color based on value
                     const value = parseFloat(event.value);
@@ -584,6 +508,7 @@ The dates and times are set to default values of the current date and time, and 
                     } else {
                         row.style.backgroundColor = '#ccffcc'; // light pastel green
                     }
+                    
                     row.appendChild(dateCell);
                     row.appendChild(timeCell);
                     row.appendChild(valueCell);
@@ -738,6 +663,7 @@ The dates and times are set to default values of the current date and time, and 
             margin-bottom: 50px; /* Increased vertical spacing between rows */
             overflow: visible;
             position: relative; /* Ensure proper positioning context */
+            padding-top: 25px;
         }
         .timeline-date {
             position: absolute;
@@ -808,10 +734,6 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #ffffff;
             padding: 0 4px;
             white-space: nowrap;
-        }
-        .timeline-row {
-            position: relative;
-            padding-top: 25px;
         }
         /* Styles for the main table */
         #results table {
