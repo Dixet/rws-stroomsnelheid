@@ -63,11 +63,13 @@ The dates and times are set to default values of the current date and time, and 
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
             const loadingSpinner = document.getElementById('loading-spinner');
+            const legend = document.querySelector('.legend');
             
             diveWindowsContainer.innerHTML = '';
             resultsContainer.innerHTML = '';
             
-            // Show loading spinner
+            // Hide legend and show loading spinner
+            legend.style.display = 'none';
             loadingSpinner.style.display = 'block';
 
             const startDate = document.getElementById('startDate').value;
@@ -107,6 +109,7 @@ The dates and times are set to default values of the current date and time, and 
         function displayResults(data ,data_w) {
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
+            const legend = document.querySelector('.legend');
 
             if (data.results && data.results.length > 0) {
                 const events = data.results[0].events;
@@ -535,6 +538,9 @@ The dates and times are set to default values of the current date and time, and 
 
                 table.appendChild(tbody);
                 resultsContainer.appendChild(table);
+                
+                // Show legend now that results are displayed
+                legend.style.display = 'block';
             } else {
                 resultsContainer.textContent = 'No results found.';
             }
@@ -677,6 +683,7 @@ The dates and times are set to default values of the current date and time, and 
         }
         .legend {
             margin-top: 20px;
+            display: none; /* Hide legend by default */
         }
         .legend div {
             display: flex;
