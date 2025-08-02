@@ -59,6 +59,17 @@ The dates and times are set to default values of the current date and time, and 
         }
 
         async function fetchData() {
+            // Clear containers immediately when button is pressed
+            const diveWindowsContainer = document.getElementById('dive-windows');
+            const resultsContainer = document.getElementById('results');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            
+            diveWindowsContainer.innerHTML = '';
+            resultsContainer.innerHTML = '';
+            
+            // Show loading spinner
+            loadingSpinner.style.display = 'block';
+
             const startDate = document.getElementById('startDate').value;
             const startTime = document.getElementById('startTime').value;
             const endDate = document.getElementById('endDate').value;
@@ -86,14 +97,16 @@ The dates and times are set to default values of the current date and time, and 
                 displayResults(data, data_w);
             } catch (error) {
                 console.error('Error fetching data:', error);
+                resultsContainer.textContent = 'Error fetching data. Please try again.';
+            } finally {
+                // Hide loading spinner when done (success or error)
+                loadingSpinner.style.display = 'none';
             }
         }
 
         function displayResults(data ,data_w) {
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
-            diveWindowsContainer.innerHTML = '';
-            resultsContainer.innerHTML = '';
 
             if (data.results && data.results.length > 0) {
                 const events = data.results[0].events;
@@ -688,6 +701,29 @@ The dates and times are set to default values of the current date and time, and 
         .legend .dark-green {
             background-color: #99ff99;
         }
+        /* Loading spinner styles */
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #666;
+            font-style: italic;
+        }
 		#source {
 			position: fixed;
 			bottom: 0;
@@ -756,6 +792,12 @@ The dates and times are set to default values of the current date and time, and 
         <br>
         <button type="submit">Get Data</button>
     </form>
+    
+    <div id="loading-spinner" class="loading-spinner">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading current data...</div>
+    </div>
+    
     <div class="legend">
         <h2>Legend</h2>
         <div><span class="red"></span> Diving not advised (current > 30 cm/s)</div>
