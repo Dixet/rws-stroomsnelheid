@@ -104,22 +104,19 @@ The dates and times are set to default values of the current date and time, and 
                 diveWindowsHeader.textContent = 'Dive windows';
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
-                // Create diving windows summary table
-                const summaryTable = document.createElement('table');
-                const summaryThead = document.createElement('thead');
-                const summaryTbody = document.createElement('tbody');
+                // Create timeline container
+                const timelineContainer = document.createElement('div');
+                timelineContainer.className = 'timeline-container';
 
-                // Create summary table headers
-                const summaryHeaderRow = document.createElement('tr');
-                ['Date', 'Starts ≤30cm/s', 'Starts ≤20cm/s', 'Ends ≤20cm/s', 'Ends ≤30cm/s'].forEach(headerText => {
-                    const header = document.createElement('th');
-                    header.textContent = headerText;
-                    summaryHeaderRow.appendChild(header);
-                });
-                summaryThead.appendChild(summaryHeaderRow);
-                summaryTable.appendChild(summaryThead);
+                // Helper function to calculate minutes between two timestamps
+                const getMinutesBetween = (start, end) => {
+                    if (!start || !end) return 0;
+                    return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
+                };
 
-                // Find diving windows
+                // First pass: find all windows and determine the longest duration
+                let maxDuration = 0;
+                let windows = [];
                 let windowStart = null;
                 let start20 = null;
                 let end20 = null;
@@ -146,45 +143,86 @@ The dates and times are set to default values of the current date and time, and 
                         if (prevValue <= 30 && value > 30) {
                             end30 = events[index - 1];
                             
-                            // If we have a complete window, add it to the table
+                            // If we have a complete window, add it to the timeline
                             if (windowStart) {
-                                const row = document.createElement('tr');
+                                const timelineRow = document.createElement('div');
+                                timelineRow.className = 'timeline-row';
                                 
-                                // Helper function to format date/time
-                                const formatDateTime = (evt) => {
-                                    if (!evt) return '-';
-                                    const localTime = UTCToLocal(evt.timeStamp);
-                                    const localDateTimeString = localTime.toLocaleString();
-                                    return localDateTimeString.split(', ')[1].substring(0,5);
-                                };
-                                
-                                // Add date (from window start)
-                                const dateCell = document.createElement('td');
+                                // Add date label
+                                const dateLabel = document.createElement('div');
+                                dateLabel.className = 'timeline-date';
                                 const localTime = UTCToLocal(windowStart.timeStamp);
                                 const localDateString = localTime.toLocaleString().split(', ')[0];
-                                dateCell.textContent = localDateString;
-                                row.appendChild(dateCell);
-                                
-                                // Add times with color coding
-                                [windowStart, start20, end20, end30].forEach((evt, idx) => {
-                                    const cell = document.createElement('td');
-                                    cell.textContent = formatDateTime(evt);
-                                    
-                                    // Color coding based on the type of timestamp
-                                    if (idx === 0 || idx === 3) {
-                                        // Start and end of ≤30cm/s window
-                                        cell.style.backgroundColor = '#ffcccc'; // light pastel red
-                                    } else if (evt) {
-                                        // Start and end of ≤20cm/s window (only if we have a value)
-                                        cell.style.backgroundColor = '#ccffcc'; // light pastel green
+                                dateLabel.textContent = localDateString;
+                                timelineRow.appendChild(dateLabel);
+
+                                // Create timeline bar container
+                                const timelineBar = document.createElement('div');
+                                timelineBar.className = 'timeline-bar';
+
+                                // Helper function to calculate minutes between two timestamps
+                                const getMinutesBetween = (start, end) => {
+                                    if (!start || !end) return 0;
+                                    return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
+                                };
+
+                                // Calculate total window duration for scaling
+                                const totalDuration = getMinutesBetween(windowStart, end30);
+
+                                // Create segments for different current speeds
+                                if (start20) {
+                                    // First segment (>20 to ≤30)
+                                    const segment1 = document.createElement('div');
+                                    segment1.className = 'timeline-segment speed-30';
+                                    const width1 = (getMinutesBetween(windowStart, start20) / totalDuration) * 100;
+                                    segment1.style.width = `${width1}%`;
+                                    timelineBar.appendChild(segment1);
+
+                                    if (end20) {
+                                        // Middle segment (≤20)
+                                        const segment2 = document.createElement('div');
+                                        segment2.className = 'timeline-segment speed-20';
+                                        const width2 = (getMinutesBetween(start20, end20) / totalDuration) * 100;
+                                        segment2.style.width = `${width2}%`;
+                                        timelineBar.appendChild(segment2);
+
+                                        // Last segment (>20 to ≤30)
+                                        const segment3 = document.createElement('div');
+                                        segment3.className = 'timeline-segment speed-30';
+                                        const width3 = (getMinutesBetween(end20, end30) / totalDuration) * 100;
+                                        segment3.style.width = `${width3}%`;
+                                        timelineBar.appendChild(segment3);
                                     } else {
-                                        // No ≤20cm/s timestamp, use the same color as ≤30cm/s
-                                        cell.style.backgroundColor = '#ffcccc'; // light pastel red
+                                        // Remaining segment (≤20)
+                                        const segment2 = document.createElement('div');
+                                        segment2.className = 'timeline-segment speed-20';
+                                        const width2 = (getMinutesBetween(start20, end30) / totalDuration) * 100;
+                                        segment2.style.width = `${width2}%`;
+                                        timelineBar.appendChild(segment2);
                                     }
-                                    row.appendChild(cell);
-                                });
+                                } else {
+                                    // Single segment for entire window (≤30)
+                                    const segment = document.createElement('div');
+                                    segment.className = 'timeline-segment speed-30';
+                                    segment.style.width = '100%';
+                                    timelineBar.appendChild(segment);
+                                }
+
+                                timelineRow.appendChild(timelineBar);
                                 
-                                summaryTbody.appendChild(row);
+                                // Add time labels
+                                const timeLabels = document.createElement('div');
+                                timeLabels.className = 'timeline-labels';
+                                [windowStart, start20, end20, end30].forEach(evt => {
+                                    if (evt) {
+                                        const label = document.createElement('span');
+                                        label.textContent = UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5);
+                                        timeLabels.appendChild(label);
+                                    }
+                                });
+                                timelineRow.appendChild(timeLabels);
+
+                                timelineContainer.appendChild(timelineRow);
                             }
                             
                             // Reset for next window
@@ -197,39 +235,8 @@ The dates and times are set to default values of the current date and time, and 
                     prevValue = value;
                 });
 
-                // Check if we have an incomplete window at the end of the data
-                if (windowStart) {
-                    const row = document.createElement('tr');
-                    const dateCell = document.createElement('td');
-                    const localTime = UTCToLocal(windowStart.timeStamp);
-                    const localDateString = localTime.toLocaleString().split(', ')[0];
-                    dateCell.textContent = localDateString;
-                    row.appendChild(dateCell);
-                    
-                    [windowStart, start20, end20, end30].forEach((evt, idx) => {
-                        const cell = document.createElement('td');
-                        cell.textContent = evt ? UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5) : '-';
-                        
-                        // Color coding based on the type of timestamp
-                        if (idx === 0 || idx === 3) {
-                            // Start and end of ≤30cm/s window
-                            cell.style.backgroundColor = '#ffcccc'; // light pastel red
-                        } else if (evt) {
-                            // Start and end of ≤20cm/s window (only if we have a value)
-                            cell.style.backgroundColor = '#ccffcc'; // light pastel green
-                        } else {
-                            // No ≤20cm/s timestamp, use the same color as ≤30cm/s
-                            cell.style.backgroundColor = '#ffcccc'; // light pastel red
-                        }
-                        row.appendChild(cell);
-                    });
-                    
-                    summaryTbody.appendChild(row);
-                }
-
-                summaryTable.appendChild(summaryTbody);
-                summaryTable.style.marginBottom = "20px";
-                diveWindowsContainer.appendChild(summaryTable);
+                timelineContainer.style.marginBottom = "20px";
+                diveWindowsContainer.appendChild(timelineContainer);
 
                 // Add header for current details section
                 const currentDetailsHeader = document.createElement('h2');
@@ -373,13 +380,53 @@ The dates and times are set to default values of the current date and time, and 
             margin-top: 20px;
             margin-bottom: 10px;
         }
-        /* Styles for the tables */
-        #dive-windows table,
+        /* Styles for the timeline */
+        .timeline-container {
+            width: 100%;
+            padding: 20px 0;
+        }
+        .timeline-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 20px;
+        }
+        .timeline-date {
+            width: 100px;
+            flex-shrink: 0;
+        }
+        .timeline-bar {
+            flex-grow: 1;
+            height: 30px;
+            display: flex;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .timeline-segment {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .timeline-segment.speed-30 {
+            background-color: #ffcccc;
+        }
+        .timeline-segment.speed-20 {
+            background-color: #ccffcc;
+        }
+        .timeline-labels {
+            width: 300px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            padding-left: 20px;
+        }
+        .timeline-labels span {
+            font-size: 0.9em;
+        }
+        /* Styles for the main table */
         #results table {
             margin-bottom: 30px;
             width: 100%;
         }
-        #dive-windows td,
         #results td {
             text-align: center;
         }
