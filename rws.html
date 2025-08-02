@@ -90,12 +90,19 @@ The dates and times are set to default values of the current date and time, and 
         }
 
         function displayResults(data ,data_w) {
+            const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
+            diveWindowsContainer.innerHTML = '';
             resultsContainer.innerHTML = '';
 
             if (data.results && data.results.length > 0) {
                 const events = data.results[0].events;
                 const events_w = data_w.results[0].events;
+
+                // Add header for dive windows section
+                const diveWindowsHeader = document.createElement('h2');
+                diveWindowsHeader.textContent = 'Dive windows';
+                diveWindowsContainer.appendChild(diveWindowsHeader);
 
                 // Create diving windows summary table
                 const summaryTable = document.createElement('table');
@@ -158,10 +165,22 @@ The dates and times are set to default values of the current date and time, and 
                                 dateCell.textContent = localDateString;
                                 row.appendChild(dateCell);
                                 
-                                // Add times
-                                [windowStart, start20, end20, end30].forEach(evt => {
+                                // Add times with color coding
+                                [windowStart, start20, end20, end30].forEach((evt, idx) => {
                                     const cell = document.createElement('td');
                                     cell.textContent = formatDateTime(evt);
+                                    
+                                    // Color coding based on the type of timestamp
+                                    if (idx === 0 || idx === 3) {
+                                        // Start and end of ≤30cm/s window
+                                        cell.style.backgroundColor = '#ffcccc'; // light pastel red
+                                    } else if (evt) {
+                                        // Start and end of ≤20cm/s window (only if we have a value)
+                                        cell.style.backgroundColor = '#ccffcc'; // light pastel green
+                                    } else {
+                                        // No ≤20cm/s timestamp, use the same color as ≤30cm/s
+                                        cell.style.backgroundColor = '#ffcccc'; // light pastel red
+                                    }
                                     row.appendChild(cell);
                                 });
                                 
@@ -187,9 +206,21 @@ The dates and times are set to default values of the current date and time, and 
                     dateCell.textContent = localDateString;
                     row.appendChild(dateCell);
                     
-                    [windowStart, start20, end20, end30].forEach(evt => {
+                    [windowStart, start20, end20, end30].forEach((evt, idx) => {
                         const cell = document.createElement('td');
                         cell.textContent = evt ? UTCToLocal(evt.timeStamp).toLocaleString().split(', ')[1].substring(0,5) : '-';
+                        
+                        // Color coding based on the type of timestamp
+                        if (idx === 0 || idx === 3) {
+                            // Start and end of ≤30cm/s window
+                            cell.style.backgroundColor = '#ffcccc'; // light pastel red
+                        } else if (evt) {
+                            // Start and end of ≤20cm/s window (only if we have a value)
+                            cell.style.backgroundColor = '#ccffcc'; // light pastel green
+                        } else {
+                            // No ≤20cm/s timestamp, use the same color as ≤30cm/s
+                            cell.style.backgroundColor = '#ffcccc'; // light pastel red
+                        }
                         row.appendChild(cell);
                     });
                     
@@ -198,7 +229,12 @@ The dates and times are set to default values of the current date and time, and 
 
                 summaryTable.appendChild(summaryTbody);
                 summaryTable.style.marginBottom = "20px";
-                resultsContainer.appendChild(summaryTable);
+                diveWindowsContainer.appendChild(summaryTable);
+
+                // Add header for current details section
+                const currentDetailsHeader = document.createElement('h2');
+                currentDetailsHeader.textContent = 'Current details';
+                resultsContainer.appendChild(currentDetailsHeader);
 
                 // Create main table
                 const table = document.createElement('table');
@@ -333,15 +369,18 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #f2f2f2;
             text-align: left;
         }
-        /* Styles for the summary table */
-        #results table:first-child {
+                h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        /* Styles for the tables */
+        #dive-windows table,
+        #results table {
             margin-bottom: 30px;
+            width: 100%;
         }
-        #results table:first-child th {
-            background-color: #e6ffe6;
-            text-align: center;
-        }
-        #results table:first-child td {
+        #dive-windows td,
+        #results td {
             text-align: center;
         }
         .legend {
@@ -445,6 +484,7 @@ The dates and times are set to default values of the current date and time, and 
         <div><span class="light-green"></span> All tidal divers (current ≤ 20 cm/s)</div>
         <div><span class="dark-green"></span> Moment of slack tide (hardly any current)</div>
     </div>
+    <div id="dive-windows"></div>
     <div id="results"></div>
 	<div id="source">Information on this page is retrieved from <a href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat Waterberichtgeving</a> and displayed as is, without any warrantees.<div>
 </body>
