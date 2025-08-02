@@ -481,7 +481,27 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Add header for current details section
                 const currentDetailsHeader = document.createElement('h2');
-                currentDetailsHeader.textContent = 'Stromingsdetails';
+                currentDetailsHeader.style.cursor = 'pointer';
+                currentDetailsHeader.style.userSelect = 'none';
+                currentDetailsHeader.innerHTML = '<span class="collapse-arrow">▼</span> Stromingsdetails';
+                
+                // Create container for collapsible content
+                const detailsContainer = document.createElement('div');
+                detailsContainer.id = 'details-container';
+                detailsContainer.style.display = 'none'; // Collapsed by default
+                
+                // Add click handler to toggle collapse
+                currentDetailsHeader.addEventListener('click', function() {
+                    const arrow = this.querySelector('.collapse-arrow');
+                    if (detailsContainer.style.display === 'none') {
+                        detailsContainer.style.display = 'block';
+                        arrow.textContent = '▲';
+                    } else {
+                        detailsContainer.style.display = 'none';
+                        arrow.textContent = '▼';
+                    }
+                });
+                
                 resultsContainer.appendChild(currentDetailsHeader);
 
                 // Create main table
@@ -572,7 +592,8 @@ The dates and times are set to default values of the current date and time, and 
                 });
 
                 table.appendChild(tbody);
-                resultsContainer.appendChild(table);
+                detailsContainer.appendChild(table);
+                resultsContainer.appendChild(detailsContainer);
                 
                 // Show legend now that results are displayed
                 legend.style.display = 'block';
@@ -737,6 +758,15 @@ The dates and times are set to default values of the current date and time, and 
         #results th:nth-child(4), #results td:nth-child(4) { /* Richting */
             width: 120px;
         }
+        /* Collapsible header styles */
+        .collapse-arrow {
+            font-size: 0.8em;
+            margin-right: 8px;
+            transition: transform 0.3s ease;
+        }
+        #results h2:hover {
+            color: #666;
+        }
         .legend {
             margin-top: 20px;
             display: none; /* Hide legend by default */
@@ -788,15 +818,13 @@ The dates and times are set to default values of the current date and time, and 
             font-style: italic;
         }
 		#source {
-			position: fixed;
-			bottom: 0;
-			left: 0;
 			width: 100%;
 			background-color: #f0f0f0; /* optional background color */
 			padding: 10px;
 			text-align: center;
 			font-size: 12px; /* adjust the font size as needed */
 			border-top: 1px solid #ccc; /* optional border at the top */
+			margin-top: 20px;
 		}
     </style>
 </head>
