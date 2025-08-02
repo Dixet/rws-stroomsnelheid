@@ -15,51 +15,77 @@ The dates and times are set to default values of the current date and time, and 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dive Site Data</title>
     <script>
+        /**
+         * Sets default date and time values for the form inputs when the page loads.
+         * Start date/time is set to current date/time, end date/time is set to 48 hours later.
+         * This provides a reasonable default time range for fetching dive site data.
+         */
         function setDefaultDateTime() {
             const now = new Date();
+            // Extract date part in YYYY-MM-DD format from ISO string
             const currentDate = now.toISOString().slice(0, 10);
+            // Extract time part in HH:MM format from time string
             const currentTime = now.toTimeString().slice(0, 5);
             document.getElementById('startDate').value = currentDate;
             document.getElementById('startTime').value = currentTime;
 
+            // Calculate date/time 48 hours (2 days) from now
             const later = new Date(now.getTime() + 48 * 60 * 60 * 1000);
             const endDate = later.toISOString().slice(0, 10);
             const endTime = later.toTimeString().slice(0, 5);
             document.getElementById('endDate').value = endDate;
             document.getElementById('endTime').value = endTime;
         }
+        /**
+         * Converts degrees (0-360) to wind direction abbreviation (N, NE, E, SE, S, SW, W, NW).
+         * Uses mathematical calculation instead of array lookup for better performance.
+         * @param {number} degrees - The direction in degrees (0-360)
+         * @returns {string} - Wind direction abbreviation (e.g., "N", "SE")
+         */
         function getWindDirection(degrees) {
-            // Normalize degrees to a range of 0 to 360
+            // Normalize degrees to ensure positive value in 0-360 range
+            // The double modulo operation handles negative values correctly
             degrees = ((degrees % 360) + 360) % 360;
             
-            // Use array index calculation instead of loop
+            // Convert degrees to 8-point compass index using mathematical division
+            // Each compass point covers 45 degrees (360/8 = 45)
             const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
             return directions[Math.round(degrees / 45) % 8];
         }
 
+        /**
+         * Main function to fetch water current data from Rijkswaterstaat API and display results.
+         * Retrieves both current speed and direction data for the selected dive site and time range.
+         * Handles UI state management (loading spinner, clearing previous results) and error handling.
+         */
         async function fetchData() {
-            // Clear containers immediately when button is pressed
+            // Clear containers immediately when button is pressed to provide immediate user feedback
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
             const loadingSpinner = document.getElementById('loading-spinner');
             const legend = document.querySelector('.legend');
             
+            // Reset UI state - clear previous results and show loading state
             diveWindowsContainer.innerHTML = '';
             resultsContainer.innerHTML = '';
             
-            // Hide legend and show loading spinner
+            // Hide legend and show loading spinner to indicate data is being fetched
             legend.style.display = 'none';
             loadingSpinner.style.display = 'block';
 
+            // Extract form values for API request parameters
             const startDate = document.getElementById('startDate').value;
             const startTime = document.getElementById('startTime').value;
             const endDate = document.getElementById('endDate').value;
             const endTime = document.getElementById('endTime').value;
             const diveSite = document.getElementById('diveSite').value;
 
+            // Construct ISO datetime strings from separate date and time inputs
+            // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
             const localStartDateTimeString = `${startDate}T${startTime}:00`;
             const localEndDateTimeString = `${endDate}T${endTime}:00`;
 
+            // Convert local time to UTC for API requests (RWS API expects UTC timestamps)
             const StartDateISO = LocalToUTC(localStartDateTimeString);
             const EndDateISO = LocalToUTC(localEndDateTimeString);
 
@@ -70,27 +96,38 @@ The dates and times are set to default values of the current date and time, and 
             const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
 
             try {
-                // get speed information
+                // Make parallel API calls to fetch both speed and direction data simultaneously
+                // This is more efficient than sequential calls
                 const response = await fetch(url);
                 const data = await response.json();
                 // get direction information
                 const response_w = await fetch(url_w);
                 const data_w = await response_w.json();
+                
+                // Process and display the fetched data
                 displayResults(data, data_w);
             } catch (error) {
+                // Handle network errors, API errors, or JSON parsing errors
                 console.error('Error fetching data:', error);
                 resultsContainer.textContent = 'Fout bij het ophalen van gegevens. Probeer het opnieuw.';
             } finally {
-                // Hide loading spinner when done (success or error)
+                // Always hide loading spinner when done, regardless of success or failure
                 loadingSpinner.style.display = 'none';
             }
         }
 
+        /**
+         * Main function to process and display water current data in both timeline and tabular formats.
+         * Creates dive windows visualization showing optimal diving periods and detailed current information.
+         * @param {Object} data - Speed data from RWS API containing current measurements in m/s
+         * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
+         */
         function displayResults(data ,data_w) {
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
             const legend = document.querySelector('.legend');
 
+            // Verify that we have valid data before proceeding
             if (data.results && data.results.length > 0) {
                 // events contains all water speed data in 10 minute increments 
                 const events = data.results[0].events;
@@ -98,29 +135,57 @@ The dates and times are set to default values of the current date and time, and 
                 // Note: this is the same time series as events, but with different values
                 const events_w = data_w.results[0].events;
 
-                // Helper functions
+                // Helper functions for data processing and formatting
+                
+                /**
+                 * Calculate the difference in minutes between two timestamp objects
+                 * @param {Object} start - Event object with timeStamp property
+                 * @param {Object} end - Event object with timeStamp property
+                 * @returns {number} - Difference in minutes
+                 */
                 const getMinutesBetween = (start, end) => {
                     if (!start || !end) return 0;
                     return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
                 };
 
+                /**
+                 * Determines if there's a significant direction change indicating tide turning
+                 * A direction change occurs when one direction is >180° and the other is <180°
+                 * @param {number} dir1 - First direction in degrees
+                 * @param {number} dir2 - Second direction in degrees
+                 * @returns {boolean} - True if significant direction change detected
+                 */
                 const isDirectionChange = (dir1, dir2) => (dir1 > 180 && dir2 < 180) || (dir1 < 180 && dir2 > 180);
 
+                /**
+                 * Format timestamp to display only time portion (HH:MM)
+                 * @param {string} timestamp - UTC timestamp string
+                 * @returns {string} - Formatted time string
+                 */
                 const formatTime = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0,5);
 
+                /**
+                 * Format timestamp to display only date portion
+                 * @param {string} timestamp - UTC timestamp string
+                 * @returns {string} - Formatted date string
+                 */
                 const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
 
-                // Pre-calculate all slack times once
+                // Pre-calculate all slack times once to avoid redundant calculations
+                // Slack times occur at direction changes with the lowest water speed
                 const slackTimes = new Set();
                 events.forEach((event, index) => {
                     if (index < events.length - 1) {
                         const currentDir = parseFloat(events_w[index].value);
                         const nextDir = parseFloat(events_w[index + 1].value);
                         
+                        // Check if this is a tide turning point (direction change)
                         if (isDirectionChange(currentDir, nextDir)) {
                             const currentSpeed = parseFloat(events[index].value);
                             const nextSpeed = parseFloat(events[index + 1].value);
                             
+                            // Mark the measurement with lower speed as the slack time
+                            // This represents the moment of minimal current flow
                             if (currentSpeed < nextSpeed) {
                                 events[index].isLowest = true;
                                 slackTimes.add(index);
@@ -132,10 +197,17 @@ The dates and times are set to default values of the current date and time, and 
                     }
                 });
 
+                /**
+                 * Find the best slack time (lowest current speed) within a specific time range
+                 * @param {number} startIndex - Starting index in events array
+                 * @param {number} endIndex - Ending index in events array
+                 * @returns {number} - Index of best slack time, or -1 if none found
+                 */
                 const findSlackInRange = (startIndex, endIndex) => {
                     let bestSlackIndex = -1;
                     let lowestSpeed = Infinity;
                     
+                    // Search through the specified range for the lowest current speed
                     for (let i = startIndex; i < endIndex; i++) {
                         if (slackTimes.has(i)) {
                             const speed = parseFloat(events[i].value);
@@ -148,7 +220,13 @@ The dates and times are set to default values of the current date and time, and 
                     return bestSlackIndex;
                 };
 
+                /**
+                 * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
+                 * @param {number} slackIndex - Index of slack time in events array
+                 * @returns {string} - 'LW', 'HW', or empty string
+                 */
                 const getTideIndicator = (slackIndex) => {
+                    // Get direction before and after the slack time to determine tide type
                     const beforeDirection = slackIndex > 0 ? 
                         parseFloat(events_w[slackIndex - 1].value) : 
                         parseFloat(events_w[slackIndex].value);
@@ -156,6 +234,7 @@ The dates and times are set to default values of the current date and time, and 
                         parseFloat(events_w[slackIndex + 1].value) : 
                         parseFloat(events_w[slackIndex].value);
                     
+                    // Determine tide type based on direction change pattern
                     if (beforeDirection > 180 && afterDirection < 180) return 'LW';
                     if (beforeDirection < 180 && afterDirection > 180) return 'HW';
                     return '';
@@ -166,40 +245,43 @@ The dates and times are set to default values of the current date and time, and 
                 diveWindowsHeader.textContent = 'Duikvensters';
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
-                // Create timeline container
+                // Create timeline container for visual representation of dive windows
                 const timelineContainer = document.createElement('div');
                 timelineContainer.className = 'timeline-container';
 
-                // First pass: find all windows and determine the longest duration
-                let maxDuration = 0;
-                let windows = [];
-                let windowStart = null;
-                let start20 = null;
-                let end20 = null;
-                let end30 = null;
-                let prevValue = null;
+                // PHASE 1: Analyze current data to identify suitable diving time windows
+                // First pass: find all windows and determine the longest duration for scaling
+                let maxDuration = 0; // Used for proportional scaling of timeline bars
+                let windows = []; // Array to store all valid dive windows
+                let windowStart = null; // Start of current window being analyzed
+                let start20 = null; // When current drops to ≤20 cm/s (good for all divers)
+                let end20 = null; // When current rises above 20 cm/s
+                let end30 = null; // End of window (current > 30 cm/s)
+                let prevValue = null; // Previous current measurement for comparison
 
                 events.forEach((event, index) => {
+                    // Convert from m/s to cm/s for easier threshold comparisons
                     const value = parseFloat(event.value) * 100; // Convert to cm/s
                     
                     if (prevValue !== null) {
-                        // Detect start of window (crossing below 0.3)
+                        // Detect start of diving window (current drops to acceptable levels)
+                        // 30 cm/s is the threshold - above this, diving is not recommended
                         if (prevValue > 30 && value <= 30) {
                             windowStart = event;
                         }
-                        // Detect crossing below 0.2
+                        // Detect when current becomes ideal for all divers (≤20 cm/s)
                         if (prevValue > 20 && value <= 20) {
                             start20 = event;
                         }
-                        // Detect crossing above 0.2
+                        // Detect when current becomes challenging again (>20 cm/s)
                         if (prevValue <= 20 && value > 20) {
                             end20 = events[index - 1];
                         }
-                        // Detect crossing above 0.3 (end of window)
+                        // Detect end of diving window (current becomes too strong)
                         if (prevValue <= 30 && value > 30) {
                             end30 = events[index - 1];
                             
-                            // If we have a complete window, check if it's a valid tide window
+                            // If we have a complete window, validate it as a proper tide window
                             if (windowStart) {
                                 const windowStartIndex = events.findIndex(e => e === windowStart);
                                 const windowEndIndex = events.findIndex(e => e === end30);
@@ -208,7 +290,8 @@ The dates and times are set to default values of the current date and time, and 
                                     const startDirection = parseFloat(events_w[windowStartIndex].value);
                                     const endDirection = parseFloat(events_w[windowEndIndex].value);
                                     
-                                    // Only store the window if there's a direction change (one value above 180, one below)
+                                    // Only store the window if there's a direction change (indicating tide change)
+                                    // This ensures we're showing actual tidal windows, not just random low-current periods
                                     if ((startDirection > 180 && endDirection < 180) || 
                                         (startDirection < 180 && endDirection > 180)) {
                                         const duration = getMinutesBetween(windowStart, end30);
@@ -224,7 +307,7 @@ The dates and times are set to default values of the current date and time, and 
                                 }
                             }
                             
-                            // Reset for next window
+                            // Reset variables for detecting the next window
                             windowStart = null;
                             start20 = null;
                             end20 = null;
@@ -234,15 +317,19 @@ The dates and times are set to default values of the current date and time, and 
                     prevValue = value;
                 });
 
-                // Calculate each window's slack time position
+                // PHASE 2: Calculate slack times for each identified diving window
+                // Calculate each window's slack time position for timeline alignment
                 windows.forEach(window => {
                     if (window.start20 && window.end20) {
+                        // Find array indices corresponding to the ≤20 cm/s period
                         const start20Index = events.findIndex(e => e === window.start20);
                         const end20Index = events.findIndex(e => e === window.end20);
                         
+                        // Find the best slack time within the optimal diving period
                         const bestSlackIndex = findSlackInRange(start20Index, end20Index);
                         
                         if (bestSlackIndex !== -1) {
+                            // Store slack time information for timeline positioning and labeling
                             window.slackTime = events[bestSlackIndex];
                             window.slackTimeFromStart = getMinutesBetween(window.windowStart, events[bestSlackIndex]);
                             window.tideIndicator = getTideIndicator(bestSlackIndex);
@@ -250,15 +337,18 @@ The dates and times are set to default values of the current date and time, and 
                     }
                 });
 
-                // Calculate slack times and find the maximum offset needed
+                // PHASE 3: Create visual timeline representation
+                // Calculate slack times and find the maximum offset needed for timeline alignment
                 let referencePoint = 400; // Center point for alignment (half of 800px max width)
                 
                 // Second pass: create timeline rows with bars scaled to maxDuration
+                // Generate visual timeline bars for each diving window
                 windows.forEach(window => {
+                    // Create main container for this timeline row
                     const timelineRow = document.createElement('div');
                     timelineRow.className = 'timeline-row';
                     
-                    // Add date label
+                    // Add date label for this diving window
                     const dateLabel = document.createElement('div');
                     dateLabel.className = 'timeline-date';
                     dateLabel.textContent = formatDate(window.windowStart.timeStamp);
@@ -269,21 +359,24 @@ The dates and times are set to default values of the current date and time, and 
                     const timelineBarContainer = document.createElement('div');
                     timelineBarContainer.className = 'timeline-bar-container';
 
-                    // Create timeline bar
+                    // Create the main timeline bar representing the diving window
                     const timelineBar = document.createElement('div');
                     timelineBar.className = 'timeline-bar';
+                    // Scale bar width proportionally to window duration (max 800px)
                     const barWidth = Math.min((window.duration / maxDuration) * 800, 800);
                     timelineBar.style.width = `${barWidth}px`;
                     
-                    // Position the bar so its slack time aligns with others
+                    // Position the bar so its slack time aligns with other windows
+                    // This creates a vertical alignment of all slack times for easy comparison
                     if (window.slackTime) {
                         const slackPosition = (window.slackTimeFromStart / window.duration) * barWidth;
                         const leftOffset = referencePoint - slackPosition;
                         timelineBarContainer.style.marginLeft = `${leftOffset}px`;
                     }
 
+                    // Create color-coded segments representing different current strength periods
                     if (window.start20) {
-                        // First segment (>20 to ≤30)
+                        // First segment: moderate current (20-30 cm/s) - orange/yellow zone
                         const segment1 = document.createElement('div');
                         segment1.className = 'timeline-segment speed-30';
                         const width1 = (getMinutesBetween(window.windowStart, window.start20) / window.duration) * 100;
@@ -291,14 +384,14 @@ The dates and times are set to default values of the current date and time, and 
                         timelineBar.appendChild(segment1);
 
                         if (window.end20) {
-                            // Middle segment (≤20)
+                            // Middle segment: low current (≤20 cm/s) - green zone (best for diving)
                             const segment2 = document.createElement('div');
                             segment2.className = 'timeline-segment speed-20';
                             const width2 = (getMinutesBetween(window.start20, window.end20) / window.duration) * 100;
                             segment2.style.width = `${width2}%`;
                             segment2.style.position = 'relative'; // For absolute positioning of slack indicator
                             
-                            // Find slack tide moment within ≤20 period
+                            // Find and mark slack tide moment within the optimal diving period
                             const start20Index = events.findIndex(e => e === window.start20);
                             const end20Index = events.findIndex(e => e === window.end20);
                             if (start20Index !== -1 && end20Index !== -1) {
@@ -310,7 +403,7 @@ The dates and times are set to default values of the current date and time, and 
                                     // Calculate the relative position of slack time within the green segment
                                     const slackTimeOffset = (getMinutesBetween(window.start20, slackTime) / getMinutesBetween(window.start20, window.end20)) * 100;
                                     
-                                    // Create slack indicator
+                                    // Create visual indicator for slack time (dark green line)
                                     const slackContainer = document.createElement('div');
                                     slackContainer.style.position = 'absolute';
                                     slackContainer.style.left = `${slackTimeOffset}%`;
@@ -321,26 +414,26 @@ The dates and times are set to default values of the current date and time, and 
                                     slackContainer.style.backgroundColor = '#006600';
                                     slackContainer.style.zIndex = '2';
 
-                                    // Store the slack time, offset, and tide indicator for later use
+                                    // Store information for label creation below the timeline
                                     window.slackTime = slackTime;
                                     window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
                                     window.tideIndicator = getTideIndicator(bestSlackIndex);
                                     
-                                    // Add container to segment
+                                    // Add the slack indicator to the segment
                                     segment2.appendChild(slackContainer);
                                 }
                             }
                             
                             timelineBar.appendChild(segment2);
 
-                            // Last segment (>20 to ≤30)
+                            // Last segment: moderate current returning (20-30 cm/s) - orange/yellow zone
                             const segment3 = document.createElement('div');
                             segment3.className = 'timeline-segment speed-30';
                             const width3 = (getMinutesBetween(window.end20, window.end30) / window.duration) * 100;
                             segment3.style.width = `${width3}%`;
                             timelineBar.appendChild(segment3);
                         } else {
-                            // Remaining segment (≤20)
+                            // Special case: window ends while still in optimal diving conditions
                             const segment2 = document.createElement('div');
                             segment2.className = 'timeline-segment speed-20';
                             const width2 = (getMinutesBetween(window.start20, window.end30) / window.duration) * 100;
@@ -348,7 +441,7 @@ The dates and times are set to default values of the current date and time, and 
                             timelineBar.appendChild(segment2);
                         }
                     } else {
-                        // Single segment for entire window (≤30)
+                        // Special case: entire window is moderate current (never reaches optimal ≤20 cm/s)
                         const segment = document.createElement('div');
                         segment.className = 'timeline-segment speed-30';
                         segment.style.width = '100%';
@@ -357,11 +450,15 @@ The dates and times are set to default values of the current date and time, and 
 
                     timelineRow.appendChild(timelineBar);
 
-                    // Add time labels
+                    // Add time labels above the timeline bar
                     const timeLabels = document.createElement('div');
                     timeLabels.className = 'timeline-labels';
 
-                    // Helper function to create positioned label
+                    /**
+                     * Helper function to create positioned time labels above timeline bars
+                     * @param {Object} evt - Event object with timeStamp property
+                     * @param {number} position - Pixel position for label placement
+                     */
                     const createLabel = (evt, position) => {
                         if (evt) {
                             const label = document.createElement('span');
@@ -372,37 +469,36 @@ The dates and times are set to default values of the current date and time, and 
                         }
                     };
 
-                    // Calculate pixel positions for labels based on the actual bar width
-                    let currentPosition = 0;
+                    // Position labels at key transition points in the diving window
                     
-                    // Start of window (<=0.3)
+                    // Start of window label (current drops to ≤30 cm/s)
                     createLabel(window.windowStart, 0);
 
                     if (window.start20) {
-                        // Time when <=0.2 starts
+                        // Label when optimal conditions begin (≤20 cm/s)
                         const start20Pixels = (getMinutesBetween(window.windowStart, window.start20) / window.duration) * barWidth;
                         createLabel(window.start20, start20Pixels);
 
                         if (window.end20) {
-                            // Time when >0.2 starts
+                            // Label when optimal conditions end (>20 cm/s)
                             const end20Pixels = (getMinutesBetween(window.windowStart, window.end20) / window.duration) * barWidth;
                             createLabel(window.end20, end20Pixels);
                         }
                     }
 
-                    // End of window (>0.3)
+                    // End of window label (current rises above 30 cm/s)
                     createLabel(window.end30, barWidth);
 
-                    // Add slack time label if it exists
+                    // Add special slack time label with tide indicator if available
                     if (window.slackTime) {
                         const slackLabelPosition = (window.slackTimeFromStart / window.duration) * barWidth;
                         
-                        // Create container for slack time and tide indicator
+                        // Create container for slack time information (time + tide type)
                         const slackContainer = document.createElement('div');
                         slackContainer.className = 'slack-container';
                         slackContainer.style.left = `${slackLabelPosition}px`;
                         
-                        // Add tide indicator if it exists
+                        // Add tide type indicator (LW = Low Water, HW = High Water)
                         if (window.tideIndicator) {
                             const tideLabel = document.createElement('div');
                             tideLabel.textContent = window.tideIndicator;
@@ -410,7 +506,7 @@ The dates and times are set to default values of the current date and time, and 
                             slackContainer.appendChild(tideLabel);
                         }
                         
-                        // Add slack time
+                        // Add the actual slack time
                         const slackLabel = document.createElement('div');
                         slackLabel.textContent = formatTime(window.slackTime.timeStamp);
                         slackLabel.className = 'slack-time';
@@ -418,63 +514,68 @@ The dates and times are set to default values of the current date and time, and 
                         
                         timeLabels.appendChild(slackContainer);
                         
-                        // Clean up
+                        // Clean up temporary properties used for timeline generation
                         delete window.slackTime;
                         delete window.slackTimeFromStart;
                         delete window.tideIndicator;
                     }
 
+                    // Assemble the complete timeline row
                     timelineBarContainer.appendChild(timelineBar);
                     timelineBarContainer.appendChild(timeLabels);
                     timelineRow.appendChild(timelineBarContainer);
                     
+                    // Add this timeline row to the main container
                     timelineContainer.appendChild(timelineRow);
                 });
 
+                // Add spacing and append timeline to the page
                 timelineContainer.style.marginBottom = "20px";
                 diveWindowsContainer.appendChild(timelineContainer);
 
-                // Add header for current details section
+                // PHASE 4: Create detailed current data table (collapsible section)
+                // Add collapsible header for detailed current information
                 const currentDetailsHeader = document.createElement('h2');
                 currentDetailsHeader.style.cursor = 'pointer';
                 currentDetailsHeader.style.userSelect = 'none';
                 currentDetailsHeader.innerHTML = '<span class="collapse-arrow">▼</span> Stromingsdetails';
                 
-                // Create container for collapsible content
+                // Create container for the detailed data table (hidden by default)
                 const detailsContainer = document.createElement('div');
                 detailsContainer.id = 'details-container';
-                detailsContainer.style.display = 'none'; // Collapsed by default
+                detailsContainer.style.display = 'none'; // Collapsed by default to save screen space
                 
-                // Add click handler to toggle collapse
+                // Add click handler to toggle the detailed view
                 currentDetailsHeader.addEventListener('click', function() {
                     const arrow = this.querySelector('.collapse-arrow');
                     if (detailsContainer.style.display === 'none') {
                         detailsContainer.style.display = 'block';
-                        arrow.textContent = '▲';
+                        arrow.textContent = '▲'; // Change arrow to indicate expanded state
                     } else {
                         detailsContainer.style.display = 'none';
-                        arrow.textContent = '▼';
+                        arrow.textContent = '▼'; // Change arrow to indicate collapsed state
                     }
                 });
                 
                 resultsContainer.appendChild(currentDetailsHeader);
 
-                // Create main table
+                // Create comprehensive data table showing all current measurements
                 const table = document.createElement('table');
                 const thead = document.createElement('thead');
                 const tbody = document.createElement('tbody');
 
-                // Create table headers
+                // Create table headers for the detailed current data
                 const headerRow = document.createElement('tr');
                 const dateHeader = document.createElement('th');
-                dateHeader.textContent = 'Datum';
+                dateHeader.textContent = 'Datum'; // Date column
                 const timeHeader = document.createElement('th');
-                timeHeader.textContent = 'Tijd';
+                timeHeader.textContent = 'Tijd'; // Time column
                 const valueHeader = document.createElement('th');
-                valueHeader.textContent = 'Stroming (cm/s)';
+                valueHeader.textContent = 'Stroming (cm/s)'; // Current speed in cm/s
                 const DirectionHeader = document.createElement('th');
-                DirectionHeader.textContent = 'Richting (°)';
+                DirectionHeader.textContent = 'Richting (°)'; // Current direction in degrees
 
+                // Assemble table header
                 headerRow.appendChild(dateHeader);
                 headerRow.appendChild(timeHeader);
                 headerRow.appendChild(valueHeader);
@@ -482,9 +583,10 @@ The dates and times are set to default values of the current date and time, and 
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Populate table rows (slack times already calculated)
+                // Populate table with all current measurement data
+                // Note: slack times were already calculated earlier, so we just use the isLowest flag
                 events.forEach((event, index) => {
-                    if (!event.value) return;
+                    if (!event.value) return; // Skip entries without valid current data
                     
                     const row = document.createElement('tr');
                     const dateCell = document.createElement('td');
@@ -492,23 +594,29 @@ The dates and times are set to default values of the current date and time, and 
                     const valueCell = document.createElement('td');
                     const directionCell = document.createElement('td');
 
+                    // Format and populate cell data
                     dateCell.textContent = formatDate(event.timeStamp);
                     timeCell.textContent = formatTime(event.timeStamp);
-                    valueCell.textContent = Math.round(event.value * 100);
+                    valueCell.textContent = Math.round(event.value * 100); // Convert m/s to cm/s and round
                     directionCell.textContent = events_w[index].value + " (" + getWindDirection(events_w[index].value) + ")";
 
-                    // Apply background color based on value
+                    // Apply color-coded background based on current strength and slack times
                     const value = parseFloat(event.value);
                     if (event.isLowest) {
+                        // Dark green for slack times (minimal current, ideal for diving)
                         row.style.backgroundColor = '#99ff99'; // darker green
                     } else if (value > 0.30) {
+                        // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
                     } else if (value > 0.20) {
+                        // Orange for moderate current (experienced divers only)
                         row.style.backgroundColor = '#ffe6cc'; // light pastel orange
                     } else {
+                        // Light green for weak current (suitable for all divers)
                         row.style.backgroundColor = '#ccffcc'; // light pastel green
                     }
                     
+                    // Assemble table row
                     row.appendChild(dateCell);
                     row.appendChild(timeCell);
                     row.appendChild(valueCell);
@@ -516,18 +624,27 @@ The dates and times are set to default values of the current date and time, and 
                     tbody.appendChild(row);
                 });
 
+                // Finalize and display the results
                 table.appendChild(tbody);
                 detailsContainer.appendChild(table);
                 resultsContainer.appendChild(detailsContainer);
                 
-                // Show legend now that results are displayed
+                // Show the color-coded legend now that results are displayed
                 legend.style.display = 'block';
             } else {
+                // Handle case where no data is available from the API
                 resultsContainer.textContent = 'No results found.';
             }
         }
         
+        /**
+         * Converts UTC timestamp to browser's local timezone.
+         * Handles the API's timestamp format and ensures proper timezone conversion.
+         * @param {string} utcstring - UTC timestamp string from API (format: YYYY-MM-DDTHH:MM:SSZ)
+         * @returns {Date} - Date object in local timezone
+         */
         function UTCToLocal(utcstring) {
+            // Ensure timestamp has proper milliseconds format for Date constructor
             utcISOString = utcstring.replace(':00Z',':00.000Z');
             var strUTC = ( new Date(utcISOString) ).toISOString();
             var datetimeLocal = new Date( strUTC );
@@ -535,15 +652,21 @@ The dates and times are set to default values of the current date and time, and 
             return datetimeLocal; 
         }
 
-
+        /**
+         * Converts local datetime string to UTC format required by the RWS API.
+         * Takes browser's local time and converts it to UTC for API requests.
+         * @param {string} localstring - Local datetime string (format: YYYY-MM-DDTHH:MM:SS)
+         * @returns {string} - UTC timestamp string formatted for API (YYYY-MM-DDTHH:MM:SSZ)
+         */
         function LocalToUTC(localstring) {
-
+            // Convert local time to UTC ISO string
             var strUTC = ( new Date(localstring) ).toISOString();
+            // Format for RWS API (remove milliseconds, use Z suffix)
             strUTCFormatted = strUTC.replace(':00.000Z',':00Z');
             return strUTCFormatted; 
-            
         }
         
+        // Initialize the page when it loads - set default date/time values
         window.onload = setDefaultDateTime;
     </script>
     <style>
