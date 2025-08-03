@@ -16,6 +16,17 @@ The dates and times are set to default values of the current date and time, and 
     <title>Dive Site Data</title>
     <script>
         /**
+         * Get the current viewport width using multiple methods for better browser compatibility
+         * @returns {number} - Current viewport width in pixels
+         */
+        function getViewportWidth() {
+            return window.innerWidth || 
+                   document.documentElement.clientWidth || 
+                   document.body.clientWidth || 
+                   1200; // Fallback to a reasonable default
+        }
+
+        /**
          * Sets default date and time values for the form inputs when the page loads.
          * Start date/time is set to current date/time, end date/time is set to 48 hours later.
          * This provides a reasonable default time range for fetching dive site data.
@@ -133,14 +144,23 @@ The dates and times are set to default values of the current date and time, and 
                 const speedEvents = data.results[0].events;
                 const directionEvents = data_w.results[0].events;
                 
-                // Create combined measurements array with speed and direction data
-                const currentMeasurements = speedEvents.map((speedEvent, index) => ({
-                    timeStamp: speedEvent.timeStamp,
-                    speed: parseFloat(speedEvent.value), // Current speed in m/s
-                    direction: parseFloat(directionEvents[index].value), // Current direction in degrees
-                    isLowest: false, // Will be set during slack time calculation
-                    isPeak: false // Will be set during peak current calculation
-                }));
+                // Create combined measurements array with speed and direction data, filtering out invalid entries
+                const currentMeasurements = speedEvents
+                    .map((speedEvent, index) => ({
+                        timeStamp: speedEvent.timeStamp,
+                        speed: parseFloat(speedEvent.value), // Current speed in m/s
+                        direction: parseFloat(directionEvents[index].value), // Current direction in degrees
+                        isLowest: false, // Will be set during slack time calculation
+                        isPeak: false // Will be set during peak current calculation
+                    }))
+                    .filter(measurement => 
+                        !isNaN(measurement.speed) && 
+                        measurement.speed !== null && 
+                        measurement.speed !== undefined &&
+                        !isNaN(measurement.direction) && 
+                        measurement.direction !== null && 
+                        measurement.direction !== undefined
+                    );
 
                 // Helper functions for data processing and formatting
                 
@@ -293,6 +313,26 @@ The dates and times are set to default values of the current date and time, and 
                 diveWindowsHeader.textContent = 'Duikvensters';
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
+                // Check if conditions are favorable throughout the entire period
+                const allSpeedsLow = currentMeasurements.every(measurement => measurement.speed <= 0.3);
+                
+                if (allSpeedsLow) {
+                    // Create favorable conditions info panel
+                    const favorableConditionsPanel = document.createElement('div');
+                    favorableConditionsPanel.style.backgroundColor = '#d4edda';
+                    favorableConditionsPanel.style.color = '#155724';
+                    favorableConditionsPanel.style.border = '1px solid #c3e6cb';
+                    favorableConditionsPanel.style.borderRadius = '8px';
+                    favorableConditionsPanel.style.padding = '15px';
+                    favorableConditionsPanel.style.margin = '15px 0 20px 0';
+                    favorableConditionsPanel.style.fontSize = '1.1em';
+                    favorableConditionsPanel.style.fontWeight = 'bold';
+                    favorableConditionsPanel.style.textAlign = 'center';
+                    favorableConditionsPanel.innerHTML = '🌊 Gunstige omstandigheden, duiken kan gedurende de hele periode worden gedaan!<br><span style="font-size: 0.9em; font-weight: normal; color: #0f5132;">Alle stromingen zijn ≤ 30 cm/s</span>';
+                    
+                    diveWindowsContainer.appendChild(favorableConditionsPanel);
+                }
+
                 // Create timeline container for visual representation of dive windows
                 const timelineContainer = document.createElement('div');
                 timelineContainer.className = 'timeline-container';
@@ -354,11 +394,11 @@ The dates and times are set to default values of the current date and time, and 
 
                 // PHASE 2: Create visual timeline representation
                 // Find the window with the longest time between start and slack for alignment
-                let maxTimeToSlack = 0;
+                let maxStartToSlackTime = 0;
                 windows.forEach(window => {
                     if (window.slackTime) {
-                        const slackTimeFromStart = getMinutesBetween(window.windowStart, window.slackTime);
-                        maxTimeToSlack = Math.max(maxTimeToSlack, slackTimeFromStart);
+                        const startToSlackTime = getMinutesBetween(window.windowStart, window.slackTime);
+                        maxStartToSlackTime = Math.max(maxStartToSlackTime, startToSlackTime);
                     }
                 });
 
@@ -383,13 +423,49 @@ The dates and times are set to default values of the current date and time, and 
                     const timelineBar = document.createElement('div');
                     timelineBar.className = 'timeline-bar';
                     
-                    // Calculate filler duration to align slack times
-                    const slackTimeFromStart = getMinutesBetween(window.windowStart, window.slackTime);
-                    const fillerDuration = maxTimeToSlack - slackTimeFromStart;
+                    // Calculate filler duration to align slack times across all windows
+                    // Filler = (max start-to-slack time across all windows) - (this window's start-to-slack time)
+                    const currentStartToSlackTime = getMinutesBetween(window.windowStart, window.slackTime);
+                    const fillerDuration = maxStartToSlackTime - currentStartToSlackTime;
                     
-                    // Scale bar width proportionally to window duration plus filler
+                    // Determine base width based on screen size for better responsiveness
+                    const screenWidth = getViewportWidth();
+                    let baseWidth;
+                    console.log('Screen width:', screenWidth); // Debug log
+                    console.log('window.innerWidth:', window.innerWidth); // Debug log
+                    console.log('document.documentElement.clientWidth:', document.documentElement.clientWidth); // Debug log
+                    
+                    if (screenWidth >= 1400) {
+                        baseWidth = 1200; // Large screens - use more space
+                    } else if (screenWidth >= 1200) {
+                        baseWidth = 1000; // Medium-large screens
+                    } else if (screenWidth >= 900) {
+                        baseWidth = 800; // Medium screens - original size
+                    } else {
+                        baseWidth = 500; // Small screens - compact size
+                    }
+                    console.log('Base width:', baseWidth); // Debug log
+                    
+                    // Calculate consistent pixels-per-minute ratio for all timeline bars
+                    // This ensures segments with the same duration have the same pixel width across all bars
+                    const maxTotalDuration = maxDuration + maxStartToSlackTime;
+                    const pixelsPerMinute = baseWidth / maxTotalDuration;
+                    
+                    // Scale bar width proportionally to window duration plus filler using consistent scale
                     const totalDuration = window.duration + fillerDuration;
-                    const barWidth = Math.min((totalDuration / (maxDuration + maxTimeToSlack)) * 800, 800);
+                    let barWidth = totalDuration * pixelsPerMinute;
+                    
+                    // Ensure minimum width for very short durations on large screens
+                    if (screenWidth >= 900) {
+                        barWidth = Math.max(barWidth, baseWidth * 0.6); // At least 60% of base width
+                        // Recalculate pixels per minute if we had to apply minimum width
+                        if (barWidth === baseWidth * 0.6) {
+                            // Only recalculate if this bar was adjusted to minimum width
+                            const adjustedPixelsPerMinute = barWidth / totalDuration;
+                        }
+                    }
+                    
+                    console.log('Calculated bar width:', barWidth); // Debug log
                     timelineBar.style.width = `${barWidth}px`;
                     
                     // Add filler segment first if needed to align slack times
@@ -398,8 +474,8 @@ The dates and times are set to default values of the current date and time, and 
                         fillerSegment.className = 'timeline-segment filler';
                         fillerSegment.style.backgroundColor = 'transparent';
                         fillerSegment.style.border = 'none';
-                        const fillerWidth = (fillerDuration / totalDuration) * 100;
-                        fillerSegment.style.width = `${fillerWidth}%`;
+                        const fillerWidthPx = fillerDuration * pixelsPerMinute;
+                        fillerSegment.style.width = `${fillerWidthPx}px`;
                         timelineBar.appendChild(fillerSegment);
                     }
 
@@ -473,9 +549,10 @@ The dates and times are set to default values of the current date and time, and 
                             isFirstVisible = false;
                         }
                         
-                        // Calculate width as percentage of total duration
-                        const segmentWidth = (segment.duration / totalDuration) * 100;
-                        segmentDiv.style.width = `${segmentWidth}%`;
+                        // Calculate width in pixels using consistent pixels-per-minute ratio
+                        // This ensures segments with the same duration appear the same width across all timeline bars
+                        const segmentWidthPx = segment.duration * pixelsPerMinute;
+                        segmentDiv.style.width = `${segmentWidthPx}px`;
                         
                         // Add slack time indicator if this segment contains the slack time
                         const segmentStartMs = new Date(segment.startTime).getTime();
@@ -515,51 +592,70 @@ The dates and times are set to default values of the current date and time, and 
                      * Helper function to create positioned time labels above timeline bars
                      * @param {Object} measurement - Measurement object with timeStamp property
                      * @param {number} position - Pixel position for label placement
+                     * @param {string} className - CSS class for the label
+                     * @param {number} minDistance - Minimum distance between labels to prevent overlap
                      */
-                    const createLabel = (measurement, position) => {
+                    const createLabel = (measurement, position, className = 'start', minDistance = 35) => {
                         if (measurement) {
-                            const label = document.createElement('span');
-                            label.textContent = formatTime(measurement.timeStamp);
-                            label.style.left = `${position}px`;
-                            label.className = 'start';
-                            timeLabels.appendChild(label);
+                            // Check if there's already a label too close to this position
+                            const existingLabels = timeLabels.querySelectorAll('span, .slack-container');
+                            let shouldSkip = false;
+                            
+                            existingLabels.forEach(existingLabel => {
+                                const existingPosition = parseFloat(existingLabel.style.left || 0);
+                                if (Math.abs(position - existingPosition) < minDistance) {
+                                    shouldSkip = true;
+                                }
+                            });
+                            
+                            if (!shouldSkip) {
+                                const label = document.createElement('span');
+                                label.textContent = formatTime(measurement.timeStamp);
+                                label.style.left = `${position}px`;
+                                label.className = className;
+                                timeLabels.appendChild(label);
+                            }
                         }
                     };
 
                     // Position labels at key points in the diving window
                     
-                    // Start of window label - adjusted for filler
+                    // Calculate minimum distance between labels based on bar width
+                    const minLabelDistance = Math.max(30, barWidth * 0.05); // At least 30px or 5% of bar width
+                    
+                    // Start of window label - adjusted for filler using consistent pixel scale
                     const startLabelPosition = fillerDuration > 0 ? 
-                        (fillerDuration / totalDuration) * barWidth : 0;
-                    createLabel(window.windowStart, startLabelPosition);
+                        fillerDuration * pixelsPerMinute : 0;
+                    createLabel(window.windowStart, startLabelPosition, 'start', minLabelDistance);
 
-                    // Add labels for each segment transition
+                    // Add labels for each segment transition, but only if there's enough space
                     let cumulativeDuration = fillerDuration;
                     segments.forEach((segment, index) => {
                         // Add label at the start of each segment (except the first one, which is the window start)
                         if (index > 0) {
-                            const segmentStartPosition = (cumulativeDuration / totalDuration) * barWidth;
+                            const segmentStartPosition = cumulativeDuration * pixelsPerMinute;
                             // Find the measurement at this transition point
                             const segmentStartTime = new Date(segment.startTime);
                             const transitionMeasurement = currentMeasurements.find(m => 
                                 Math.abs(new Date(m.timeStamp) - segmentStartTime) < 1000 // Within 1 second
                             );
                             if (transitionMeasurement) {
-                                createLabel(transitionMeasurement, segmentStartPosition);
+                                createLabel(transitionMeasurement, segmentStartPosition, 'transition', minLabelDistance);
                             }
                         }
                         cumulativeDuration += segment.duration;
                     });
 
-                    // End of window label
+                    // End of window label using consistent pixel scale
                     const endLabelPosition = fillerDuration > 0 ? 
-                        ((fillerDuration + window.duration) / totalDuration) * barWidth : barWidth;
-                    createLabel(window.windowEnd, endLabelPosition);
+                        (fillerDuration + window.duration) * pixelsPerMinute : barWidth;
+                    createLabel(window.windowEnd, endLabelPosition, 'end', minLabelDistance);
 
                     // Add special slack time label with tide indicator
                     if (window.slackTime) {
-                        // Slack time should now be aligned at the same position for all windows
-                        const slackLabelPosition = (maxTimeToSlack / totalDuration) * barWidth;
+                        // Slack time should be positioned at the same location for all windows using consistent pixel scale
+                        // Position = maxStartToSlackTime from the start of the timeline
+                        const slackLabelPosition = maxStartToSlackTime * pixelsPerMinute;
                         
                         // Create container for slack time information (time + tide type)
                         const slackContainer = document.createElement('div');
@@ -746,6 +842,29 @@ The dates and times are set to default values of the current date and time, and 
         
         // Initialize the page when it loads - set default date/time values
         window.onload = setDefaultDateTime;
+        
+        // Add resize event listener to recalculate timeline widths when window is resized
+        let resizeTimeout;
+        window.addEventListener('resize', function() {
+            // Debounce resize events to avoid excessive recalculations
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(function() {
+                const resultsContainer = document.getElementById('results');
+                const diveWindowsContainer = document.getElementById('dive-windows');
+                
+                console.log('Resize detected, viewport width:', getViewportWidth()); // Debug log
+                
+                // Only recalculate if we have data displayed
+                if (resultsContainer.innerHTML.trim() !== '' || diveWindowsContainer.innerHTML.trim() !== '') {
+                    // Trigger a data refresh to recalculate with new screen dimensions
+                    // Only if we're not currently loading data
+                    const loadingSpinner = document.getElementById('loading-spinner');
+                    if (loadingSpinner.style.display === 'none') {
+                        fetchData();
+                    }
+                }
+            }, 250); // Wait 250ms after resize stops
+        });
     </script>
     <style>
 		body {
@@ -884,6 +1003,15 @@ The dates and times are set to default values of the current date and time, and 
             position: relative;
             padding-left: 20px; /* Minimal left padding */
             overflow-x: auto; /* Allow horizontal scrolling on small screens */
+            max-width: none; /* Remove any width constraints */
+        }
+        
+        /* Responsive timeline container padding */
+        @media (min-width: 1400px) {
+            .timeline-container {
+                padding-left: 30px; /* More padding for larger screens */
+                padding-right: 30px;
+            }
         }
         .timeline-row {
             display: flex;
@@ -892,7 +1020,26 @@ The dates and times are set to default values of the current date and time, and 
             overflow: visible;
             position: relative; /* Ensure proper positioning context */
             padding-top: 35px; /* Increased to ensure labels don't interfere with previous row */
-            min-width: 950px; /* Minimum width to prevent crushing */
+            min-width: 950px; /* Default minimum width */
+        }
+        
+        /* Responsive timeline row widths */
+        @media (min-width: 1400px) {
+            .timeline-row {
+                min-width: 1400px; /* Large screens */
+            }
+        }
+        
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .timeline-row {
+                min-width: 1200px; /* Medium-large screens */
+            }
+        }
+        
+        @media (min-width: 900px) and (max-width: 1199px) {
+            .timeline-row {
+                min-width: 1000px; /* Medium screens */
+            }
         }
         .timeline-date {
             position: absolute;
@@ -904,11 +1051,30 @@ The dates and times are set to default values of the current date and time, and 
             font-size: 0.9em;
         }
         .timeline-bar {
-            width: 800px; /* Base width for the longest duration */
             height: 30px;
             display: flex;
             border-radius: 4px;
             flex-shrink: 0;
+            /* Width is set dynamically via JavaScript based on screen size */
+        }
+        
+        /* Responsive timeline bar sizing */
+        @media (min-width: 1400px) {
+            .timeline-bar {
+                max-width: 1200px; /* Large screens */
+            }
+        }
+        
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .timeline-bar {
+                max-width: 1000px; /* Medium-large screens */
+            }
+        }
+        
+        @media (min-width: 900px) and (max-width: 1199px) {
+            .timeline-bar {
+                max-width: 800px; /* Medium screens */
+            }
         }
         .timeline-segment {
             height: 100%;
@@ -964,12 +1130,42 @@ The dates and times are set to default values of the current date and time, and 
             white-space: nowrap;
             top: 15px;
             transform: translateX(-50%);
+            text-shadow: 0 0 3px white; /* Add text shadow to improve readability when labels are close */
+        }
+        
+        /* Label styling for different types */
+        .timeline-labels span.transition {
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        .timeline-labels span.start,
+        .timeline-labels span.end {
+            font-size: 0.8em; /* Match transition label size */
+            color: #666; /* Match transition label color */
+            font-weight: normal; /* Remove bold to match transition labels */
         }
         .timeline-bar-container {
             position: absolute;
             display: flex;
             left: 100px; /* Position right after the date label (80px width + 20px gap) */
             min-width: 0; /* Prevent container from growing beyond parent width */
+            max-width: calc(100% - 120px); /* Ensure container fits within parent */
+        }
+        
+        /* Responsive positioning for timeline bar container */
+        @media (min-width: 1400px) {
+            .timeline-bar-container {
+                left: 120px; /* More space for larger screens */
+                max-width: calc(100% - 140px);
+            }
+        }
+        
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .timeline-bar-container {
+                left: 110px;
+                max-width: calc(100% - 130px);
+            }
         }
         .slack-container {
             position: absolute;
@@ -979,19 +1175,24 @@ The dates and times are set to default values of the current date and time, and 
             display: flex;
             flex-direction: column;
             align-items: center;
+            top: -2px; /* Position tide indicator above the baseline */
         }
         .tide-indicator {
             color: #468046;
             font-weight: bold;
-            margin-bottom: 2px;
-            font-size: 0.8em;
+            margin-bottom: 0px; /* Remove space between tide indicator and slack time */
+            font-size: 0.8em; /* Match slack-time font size */
             white-space: nowrap;
+            line-height: 1;
         }
         .slack-time {
             color: #468046;
             font-weight: bold;
             padding: 0 4px;
             white-space: nowrap;
+            font-size: 0.8em; /* Explicit font size to match tide-indicator */
+            margin-top: 5px; /* Align with other labels while keeping close to tide indicator */
+            line-height: 1;
         }
         /* Styles for the main table */
         #results table {
