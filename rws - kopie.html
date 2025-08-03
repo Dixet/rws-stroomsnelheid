@@ -129,18 +129,11 @@ The dates and times are set to default values of the current date and time, and 
 
             // Verify that we have valid data before proceeding
             if (data.results && data.results.length > 0) {
-                // Combine speed and direction data into a single array for easier processing
-                const speedEvents = data.results[0].events;
-                const directionEvents = data_w.results[0].events;
-                
-                // Create combined measurements array with speed and direction data
-                const currentMeasurements = speedEvents.map((speedEvent, index) => ({
-                    timeStamp: speedEvent.timeStamp,
-                    speed: parseFloat(speedEvent.value), // Current speed in m/s
-                    direction: parseFloat(directionEvents[index].value), // Current direction in degrees
-                    isLowest: false, // Will be set during slack time calculation
-                    isPeak: false // Will be set during peak current calculation
-                }));
+                // events contains all water speed data in 10 minute increments 
+                const events = data.results[0].events;
+                // events_w contains all water direction data in 10 minute increments
+                // Note: this is the same time series as events, but with different values
+                const events_w = data_w.results[0].events;
 
                 // Helper functions for data processing and formatting
                 
@@ -181,92 +174,51 @@ The dates and times are set to default values of the current date and time, and 
                 // Pre-calculate all slack times once to avoid redundant calculations
                 // Slack times occur at direction changes with the lowest water speed
                 const slackTimes = new Set();
-                currentMeasurements.forEach((measurement, index) => {
-                    if (index < currentMeasurements.length - 1) {
-                        const currentDir = measurement.direction;
-                        const nextDir = currentMeasurements[index + 1].direction;
+                events.forEach((event, index) => {
+                    if (index < events.length - 1) {
+                        const currentDir = parseFloat(events_w[index].value);
+                        const nextDir = parseFloat(events_w[index + 1].value);
                         
                         // Check if this is a tide turning point (direction change)
                         if (isDirectionChange(currentDir, nextDir)) {
-                            const currentSpeed = measurement.speed;
-                            const nextSpeed = currentMeasurements[index + 1].speed;
+                            const currentSpeed = parseFloat(events[index].value);
+                            const nextSpeed = parseFloat(events[index + 1].value);
                             
                             // Mark the measurement with lower speed as the slack time
                             // This represents the moment of minimal current flow
                             if (currentSpeed < nextSpeed) {
-                                currentMeasurements[index].isLowest = true;
+                                events[index].isLowest = true;
                                 slackTimes.add(index);
                             } else {
-                                currentMeasurements[index + 1].isLowest = true;
+                                events[index + 1].isLowest = true;
                                 slackTimes.add(index + 1);
                             }
                         }
                     }
                 });
 
-                // Calculate peak currents - highest speed between slack tides
-                // Convert slackTimes set to sorted array for easier processing
-                const slackIndices = Array.from(slackTimes).sort((a, b) => a - b);
-                
-                // Find peak currents between consecutive slack times
-                for (let i = 0; i < slackIndices.length - 1; i++) {
-                    const startIndex = slackIndices[i];
-                    const endIndex = slackIndices[i + 1];
+                /**
+                 * Find the best slack time (lowest current speed) within a specific time range
+                 * @param {number} startIndex - Starting index in events array
+                 * @param {number} endIndex - Ending index in events array
+                 * @returns {number} - Index of best slack time, or -1 if none found
+                 */
+                const findSlackInRange = (startIndex, endIndex) => {
+                    let bestSlackIndex = -1;
+                    let lowestSpeed = Infinity;
                     
-                    // Find the measurement with highest speed between these slack times
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    
-                    for (let j = startIndex + 1; j < endIndex; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
+                    // Search through the specified range for the lowest current speed
+                    for (let i = startIndex; i < endIndex; i++) {
+                        if (slackTimes.has(i)) {
+                            const speed = parseFloat(events[i].value);
+                            if (speed < lowestSpeed) {
+                                lowestSpeed = speed;
+                                bestSlackIndex = i;
+                            }
                         }
                     }
-                    
-                    // Mark the peak current if found
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
-                
-                // Handle peak current before first slack time (if any measurements exist before first slack)
-                if (slackIndices.length > 0 && slackIndices[0] > 0) {
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    
-                    for (let j = 0; j < slackIndices[0]; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
-                        }
-                    }
-                    
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
-                
-                // Handle peak current after last slack time (if any measurements exist after last slack)
-                if (slackIndices.length > 0 && slackIndices[slackIndices.length - 1] < currentMeasurements.length - 1) {
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    const lastSlackIndex = slackIndices[slackIndices.length - 1];
-                    
-                    for (let j = lastSlackIndex + 1; j < currentMeasurements.length; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
-                        }
-                    }
-                    
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
+                    return bestSlackIndex;
+                };
 
                 /**
                  * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
@@ -276,11 +228,11 @@ The dates and times are set to default values of the current date and time, and 
                 const getTideIndicator = (slackIndex) => {
                     // Get direction before and after the slack time to determine tide type
                     const beforeDirection = slackIndex > 0 ? 
-                        currentMeasurements[slackIndex - 1].direction : 
-                        currentMeasurements[slackIndex].direction;
-                    const afterDirection = slackIndex < currentMeasurements.length - 1 ? 
-                        currentMeasurements[slackIndex + 1].direction : 
-                        currentMeasurements[slackIndex].direction;
+                        parseFloat(events_w[slackIndex - 1].value) : 
+                        parseFloat(events_w[slackIndex].value);
+                    const afterDirection = slackIndex < events_w.length - 1 ? 
+                        parseFloat(events_w[slackIndex + 1].value) : 
+                        parseFloat(events_w[slackIndex].value);
                     
                     // Determine tide type based on direction change pattern
                     if (beforeDirection > 180 && afterDirection < 180) return 'LW';
@@ -297,68 +249,100 @@ The dates and times are set to default values of the current date and time, and 
                 const timelineContainer = document.createElement('div');
                 timelineContainer.className = 'timeline-container';
 
-                // PHASE 1: Create dive windows based on slack tides - one window per slack tide
-                // Each window extends from the peak before the slack tide to the peak after it
-                let windows = []; // Array to store all valid dive windows
+                // PHASE 1: Analyze current data to identify suitable diving time windows
+                // First pass: find all windows and determine the longest duration for scaling
                 let maxDuration = 0; // Used for proportional scaling of timeline bars
-                
-                // Create a window for each slack tide
-                slackIndices.forEach((slackIndex, windowIndex) => {
-                    // Find the peak before this slack tide
-                    let peakBeforeIndex = -1;
-                    for (let i = slackIndex - 1; i >= 0; i--) {
-                        if (currentMeasurements[i].isPeak) {
-                            peakBeforeIndex = i;
-                            break;
+                let windows = []; // Array to store all valid dive windows
+                let windowStart = null; // Start of current window being analyzed
+                let start20 = null; // When current drops to ≤20 cm/s (good for all divers)
+                let end20 = null; // When current rises above 20 cm/s
+                let end30 = null; // End of window (current > 30 cm/s)
+                let prevValue = null; // Previous current measurement for comparison
+
+                events.forEach((event, index) => {
+                    // Convert from m/s to cm/s for easier threshold comparisons
+                    const value = parseFloat(event.value) * 100; // Convert to cm/s
+                    
+                    if (prevValue !== null) {
+                        // Detect start of diving window (current drops to acceptable levels)
+                        // 30 cm/s is the threshold - above this, diving is not recommended
+                        if (prevValue > 30 && value <= 30) {
+                            windowStart = event;
+                        }
+                        // Detect when current becomes ideal for all divers (≤20 cm/s)
+                        if (prevValue > 20 && value <= 20) {
+                            start20 = event;
+                        }
+                        // Detect when current becomes challenging again (>20 cm/s)
+                        if (prevValue <= 20 && value > 20) {
+                            end20 = events[index - 1];
+                        }
+                        // Detect end of diving window (current becomes too strong)
+                        if (prevValue <= 30 && value > 30) {
+                            end30 = events[index - 1];
+                            
+                            // If we have a complete window, validate it as a proper tide window
+                            if (windowStart) {
+                                const windowStartIndex = events.findIndex(e => e === windowStart);
+                                const windowEndIndex = events.findIndex(e => e === end30);
+                                
+                                if (windowStartIndex !== -1 && windowEndIndex !== -1) {
+                                    const startDirection = parseFloat(events_w[windowStartIndex].value);
+                                    const endDirection = parseFloat(events_w[windowEndIndex].value);
+                                    
+                                    // Only store the window if there's a direction change (indicating tide change)
+                                    // This ensures we're showing actual tidal windows, not just random low-current periods
+                                    if ((startDirection > 180 && endDirection < 180) || 
+                                        (startDirection < 180 && endDirection > 180)) {
+                                        const duration = getMinutesBetween(windowStart, end30);
+                                        maxDuration = Math.max(maxDuration, duration);
+                                        windows.push({
+                                            windowStart,
+                                            start20,
+                                            end20,
+                                            end30,
+                                            duration
+                                        });
+                                    }
+                                }
+                            }
+                            
+                            // Reset variables for detecting the next window
+                            windowStart = null;
+                            start20 = null;
+                            end20 = null;
+                            end30 = null;
                         }
                     }
-                    
-                    // Find the peak after this slack tide
-                    let peakAfterIndex = -1;
-                    for (let i = slackIndex + 1; i < currentMeasurements.length; i++) {
-                        if (currentMeasurements[i].isPeak) {
-                            peakAfterIndex = i;
-                            break;
-                        }
-                    }
-                    
-                    // Only create a window if we have both peaks (or use data boundaries)
-                    let windowStart, windowEnd;
-                    
-                    if (peakBeforeIndex !== -1) {
-                        windowStart = currentMeasurements[peakBeforeIndex];
-                    } else {
-                        // If no peak before, start from beginning of data
-                        windowStart = currentMeasurements[0];
-                    }
-                    
-                    if (peakAfterIndex !== -1) {
-                        windowEnd = currentMeasurements[peakAfterIndex];
-                    } else {
-                        // If no peak after, end at end of data
-                        windowEnd = currentMeasurements[currentMeasurements.length - 1];
-                    }
-                    
-                    const duration = getMinutesBetween(windowStart, windowEnd);
-                    maxDuration = Math.max(maxDuration, duration);
-                    
-                    windows.push({
-                        windowStart,
-                        windowEnd,
-                        slackTime: currentMeasurements[slackIndex],
-                        slackIndex: slackIndex,
-                        duration,
-                        tideIndicator: getTideIndicator(slackIndex)
-                    });
+                    prevValue = value;
                 });
 
-                // PHASE 2: Create visual timeline representation
+                // PHASE 2: Calculate slack times for each identified diving window
+                // Calculate each window's slack time position for timeline alignment
+                windows.forEach(window => {
+                    if (window.start20 && window.end20) {
+                        // Find array indices corresponding to the ≤20 cm/s period
+                        const start20Index = events.findIndex(e => e === window.start20);
+                        const end20Index = events.findIndex(e => e === window.end20);
+                        
+                        // Find the best slack time within the optimal diving period
+                        const bestSlackIndex = findSlackInRange(start20Index, end20Index);
+                        
+                        if (bestSlackIndex !== -1) {
+                            // Store slack time information for timeline positioning and labeling
+                            window.slackTime = events[bestSlackIndex];
+                            window.slackTimeFromStart = getMinutesBetween(window.windowStart, events[bestSlackIndex]);
+                            window.tideIndicator = getTideIndicator(bestSlackIndex);
+                        }
+                    }
+                });
+
+                // PHASE 3: Create visual timeline representation
                 // Find the window with the longest time between start and slack for alignment
                 let maxTimeToSlack = 0;
                 windows.forEach(window => {
                     if (window.slackTime) {
-                        const slackTimeFromStart = getMinutesBetween(window.windowStart, window.slackTime);
-                        maxTimeToSlack = Math.max(maxTimeToSlack, slackTimeFromStart);
+                        maxTimeToSlack = Math.max(maxTimeToSlack, window.slackTimeFromStart);
                     }
                 });
 
@@ -384,8 +368,8 @@ The dates and times are set to default values of the current date and time, and 
                     timelineBar.className = 'timeline-bar';
                     
                     // Calculate filler duration to align slack times
-                    const slackTimeFromStart = getMinutesBetween(window.windowStart, window.slackTime);
-                    const fillerDuration = maxTimeToSlack - slackTimeFromStart;
+                    const fillerDuration = window.slackTime ? 
+                        maxTimeToSlack - window.slackTimeFromStart : 0;
                     
                     // Scale bar width proportionally to window duration plus filler
                     const totalDuration = window.duration + fillerDuration;
@@ -403,107 +387,88 @@ The dates and times are set to default values of the current date and time, and 
                         timelineBar.appendChild(fillerSegment);
                     }
 
-                    // Create segments based on current speed thresholds
-                    // Get indices for window start and end
-                    const windowStartIndex = currentMeasurements.findIndex(m => m === window.windowStart);
-                    const windowEndIndex = currentMeasurements.findIndex(m => m === window.windowEnd);
-                    
-                    // Analyze the current data to create color-coded segments
-                    let currentSegmentStart = windowStartIndex;
-                    let currentSegmentType = null;
-                    
-                    // Helper function to determine segment type based on current speed
-                    const getSegmentType = (speedInMs) => {
-                        const speedInCms = speedInMs * 100;
-                        if (speedInCms > 30) return 'strong'; // > 30 cm/s - red
-                        if (speedInCms > 20) return 'moderate'; // 20-30 cm/s - orange  
-                        return 'weak'; // ≤ 20 cm/s - green
-                    };
-                    
-                    // Create segments by analyzing speed changes
-                    const segments = [];
-                    let segmentStartTime = window.windowStart.timeStamp;
-                    let segmentStartType = getSegmentType(currentMeasurements[windowStartIndex].speed);
-                    
-                    for (let i = windowStartIndex + 1; i <= windowEndIndex; i++) {
-                        const currentType = getSegmentType(currentMeasurements[i].speed);
-                        
-                        // If segment type changes, close current segment and start new one
-                        if (currentType !== segmentStartType || i === windowEndIndex) {
-                            const segmentEndTime = currentMeasurements[i].timeStamp;
-                            const segmentDuration = (new Date(segmentEndTime) - new Date(segmentStartTime)) / (1000 * 60);
-                            
-                            segments.push({
-                                type: segmentStartType,
-                                duration: segmentDuration,
-                                startTime: segmentStartTime,
-                                endTime: segmentEndTime
-                            });
-                            
-                            segmentStartTime = segmentEndTime;
-                            segmentStartType = currentType;
+                    // No special positioning needed - bars will be left-aligned by default CSS
+
+                    // Create color-coded segments representing different current strength periods
+                    if (window.start20) {
+                        // First segment: moderate current (20-30 cm/s) - orange/yellow zone
+                        const segment1 = document.createElement('div');
+                        segment1.className = 'timeline-segment speed-30';
+                        // Mark as first visible if there's no filler, or add class if there is a filler
+                        if (fillerDuration === 0) {
+                            segment1.classList.add('first-visible');
+                        } else {
+                            // If there's a filler, this segment is still the first visible one
+                            segment1.classList.add('first-visible');
                         }
+                        const width1 = (getMinutesBetween(window.windowStart, window.start20) / totalDuration) * 100;
+                        segment1.style.width = `${width1}%`;
+                        timelineBar.appendChild(segment1);
+
+                        if (window.end20) {
+                            // Middle segment: low current (≤20 cm/s) - green zone (best for diving)
+                            const segment2 = document.createElement('div');
+                            segment2.className = 'timeline-segment speed-20';
+                            const width2 = (getMinutesBetween(window.start20, window.end20) / totalDuration) * 100;
+                            segment2.style.width = `${width2}%`;
+                            segment2.style.position = 'relative'; // For absolute positioning of slack indicator
+                            
+                            // Find and mark slack tide moment within the optimal diving period
+                            const start20Index = events.findIndex(e => e === window.start20);
+                            const end20Index = events.findIndex(e => e === window.end20);
+                            if (start20Index !== -1 && end20Index !== -1) {
+                                const bestSlackIndex = findSlackInRange(start20Index, end20Index);
+
+                                if (bestSlackIndex !== -1) {
+                                    const slackTime = events[bestSlackIndex];
+                                    
+                                    // Calculate the relative position of slack time within the green segment
+                                    const slackTimeOffset = (getMinutesBetween(window.start20, slackTime) / getMinutesBetween(window.start20, window.end20)) * 100;
+                                    
+                                    // Create visual indicator for slack time (dark green line)
+                                    const slackContainer = document.createElement('div');
+                                    slackContainer.style.position = 'absolute';
+                                    slackContainer.style.left = `${slackTimeOffset}%`;
+                                    slackContainer.style.top = '0';
+                                    slackContainer.style.height = '100%';
+                                    slackContainer.style.transform = 'translateX(-50%)';
+                                    slackContainer.style.width = '2px';
+                                    slackContainer.style.backgroundColor = '#006600';
+                                    slackContainer.style.zIndex = '2';
+
+                                    // Store information for label creation below the timeline
+                                    window.slackTime = slackTime;
+                                    window.slackTimeFromStart = getMinutesBetween(window.windowStart, slackTime);
+                                    window.tideIndicator = getTideIndicator(bestSlackIndex);
+                                    
+                                    // Add the slack indicator to the segment
+                                    segment2.appendChild(slackContainer);
+                                }
+                            }
+                            
+                            timelineBar.appendChild(segment2);
+
+                            // Last segment: moderate current returning (20-30 cm/s) - orange/yellow zone
+                            const segment3 = document.createElement('div');
+                            segment3.className = 'timeline-segment speed-30';
+                            const width3 = (getMinutesBetween(window.end20, window.end30) / totalDuration) * 100;
+                            segment3.style.width = `${width3}%`;
+                            timelineBar.appendChild(segment3);
+                        } else {
+                            // Special case: window ends while still in optimal diving conditions
+                            const segment2 = document.createElement('div');
+                            segment2.className = 'timeline-segment speed-20';
+                            const width2 = (getMinutesBetween(window.start20, window.end30) / totalDuration) * 100;
+                            segment2.style.width = `${width2}%`;
+                            timelineBar.appendChild(segment2);
+                        }
+                    } else {
+                        // Special case: entire window is moderate current (never reaches optimal ≤20 cm/s)
+                        const segment = document.createElement('div');
+                        segment.className = 'timeline-segment speed-30 first-visible';
+                        segment.style.width = '100%';
+                        timelineBar.appendChild(segment);
                     }
-                    
-                    // Create visual segments
-                    let isFirstVisible = true;
-                    segments.forEach((segment, index) => {
-                        const segmentDiv = document.createElement('div');
-                        segmentDiv.className = 'timeline-segment';
-                        
-                        // Apply appropriate styling based on segment type
-                        switch (segment.type) {
-                            case 'strong':
-                                segmentDiv.classList.add('speed-strong');
-                                break;
-                            case 'moderate':
-                                segmentDiv.classList.add('speed-moderate');
-                                break;
-                            case 'weak':
-                                segmentDiv.classList.add('speed-weak');
-                                break;
-                        }
-                        
-                        // Mark first visible segment
-                        if (isFirstVisible && fillerDuration === 0) {
-                            segmentDiv.classList.add('first-visible');
-                            isFirstVisible = false;
-                        } else if (isFirstVisible) {
-                            segmentDiv.classList.add('first-visible');
-                            isFirstVisible = false;
-                        }
-                        
-                        // Calculate width as percentage of total duration
-                        const segmentWidth = (segment.duration / totalDuration) * 100;
-                        segmentDiv.style.width = `${segmentWidth}%`;
-                        
-                        // Add slack time indicator if this segment contains the slack time
-                        const segmentStartMs = new Date(segment.startTime).getTime();
-                        const segmentEndMs = new Date(segment.endTime).getTime();
-                        const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
-                        
-                        if (slackTimeMs >= segmentStartMs && slackTimeMs <= segmentEndMs) {
-                            segmentDiv.style.position = 'relative';
-                            
-                            // Calculate relative position within the segment
-                            const relativePosition = ((slackTimeMs - segmentStartMs) / (segmentEndMs - segmentStartMs)) * 100;
-                            
-                            // Create visual indicator for slack time (dark green line)
-                            const slackContainer = document.createElement('div');
-                            slackContainer.style.position = 'absolute';
-                            slackContainer.style.left = `${relativePosition}%`;
-                            slackContainer.style.top = '0';
-                            slackContainer.style.height = '100%';
-                            slackContainer.style.transform = 'translateX(-50%)';
-                            slackContainer.style.width = '2px';
-                            slackContainer.style.backgroundColor = '#006600';
-                            slackContainer.style.zIndex = '2';
-                            
-                            segmentDiv.appendChild(slackContainer);
-                        }
-                        
-                        timelineBar.appendChild(segmentDiv);
-                    });
 
                     timelineRow.appendChild(timelineBar);
 
@@ -513,50 +478,44 @@ The dates and times are set to default values of the current date and time, and 
 
                     /**
                      * Helper function to create positioned time labels above timeline bars
-                     * @param {Object} measurement - Measurement object with timeStamp property
+                     * @param {Object} evt - Event object with timeStamp property
                      * @param {number} position - Pixel position for label placement
                      */
-                    const createLabel = (measurement, position) => {
-                        if (measurement) {
+                    const createLabel = (evt, position) => {
+                        if (evt) {
                             const label = document.createElement('span');
-                            label.textContent = formatTime(measurement.timeStamp);
+                            label.textContent = formatTime(evt.timeStamp);
                             label.style.left = `${position}px`;
                             label.className = 'start';
                             timeLabels.appendChild(label);
                         }
                     };
 
-                    // Position labels at key points in the diving window
+                    // Position labels at key transition points in the diving window
                     
-                    // Start of window label - adjusted for filler
+                    // Start of window label (current drops to ≤30 cm/s) - adjusted for filler
                     const startLabelPosition = fillerDuration > 0 ? 
                         (fillerDuration / totalDuration) * barWidth : 0;
                     createLabel(window.windowStart, startLabelPosition);
 
-                    // Add labels for each segment transition
-                    let cumulativeDuration = fillerDuration;
-                    segments.forEach((segment, index) => {
-                        // Add label at the start of each segment (except the first one, which is the window start)
-                        if (index > 0) {
-                            const segmentStartPosition = (cumulativeDuration / totalDuration) * barWidth;
-                            // Find the measurement at this transition point
-                            const segmentStartTime = new Date(segment.startTime);
-                            const transitionMeasurement = currentMeasurements.find(m => 
-                                Math.abs(new Date(m.timeStamp) - segmentStartTime) < 1000 // Within 1 second
-                            );
-                            if (transitionMeasurement) {
-                                createLabel(transitionMeasurement, segmentStartPosition);
-                            }
-                        }
-                        cumulativeDuration += segment.duration;
-                    });
+                    if (window.start20) {
+                        // Label when optimal conditions begin (≤20 cm/s)
+                        const start20Pixels = ((fillerDuration + getMinutesBetween(window.windowStart, window.start20)) / totalDuration) * barWidth;
+                        createLabel(window.start20, start20Pixels);
 
-                    // End of window label
+                        if (window.end20) {
+                            // Label when optimal conditions end (>20 cm/s)
+                            const end20Pixels = ((fillerDuration + getMinutesBetween(window.windowStart, window.end20)) / totalDuration) * barWidth;
+                            createLabel(window.end20, end20Pixels);
+                        }
+                    }
+
+                    // End of window label (current rises above 30 cm/s)
                     const endLabelPosition = fillerDuration > 0 ? 
                         ((fillerDuration + window.duration) / totalDuration) * barWidth : barWidth;
-                    createLabel(window.windowEnd, endLabelPosition);
+                    createLabel(window.end30, endLabelPosition);
 
-                    // Add special slack time label with tide indicator
+                    // Add special slack time label with tide indicator if available
                     if (window.slackTime) {
                         // Slack time should now be aligned at the same position for all windows
                         const slackLabelPosition = (maxTimeToSlack / totalDuration) * barWidth;
@@ -581,6 +540,11 @@ The dates and times are set to default values of the current date and time, and 
                         slackContainer.appendChild(slackLabel);
                         
                         timeLabels.appendChild(slackContainer);
+                        
+                        // Clean up temporary properties used for timeline generation
+                        delete window.slackTime;
+                        delete window.slackTimeFromStart;
+                        delete window.tideIndicator;
                     }
 
                     // Assemble the complete timeline row
@@ -603,7 +567,7 @@ The dates and times are set to default values of the current date and time, and 
                 scrollHint.style.display = 'none'; // Hidden by default, shown via CSS media query
                 diveWindowsContainer.appendChild(scrollHint);
 
-                // PHASE 3: Create detailed current data table (collapsible section)
+                // PHASE 4: Create detailed current data table (collapsible section)
                 // Add collapsible header for detailed current information
                 const currentDetailsHeader = document.createElement('h2');
                 currentDetailsHeader.style.cursor = 'pointer';
@@ -655,8 +619,8 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Populate table with all current measurement data
                 // Note: slack times were already calculated earlier, so we just use the isLowest flag
-                currentMeasurements.forEach((measurement, index) => {
-                    if (!measurement.speed) return; // Skip entries without valid current data
+                events.forEach((event, index) => {
+                    if (!event.value) return; // Skip entries without valid current data
                     
                     const row = document.createElement('tr');
                     const dateCell = document.createElement('td');
@@ -665,22 +629,20 @@ The dates and times are set to default values of the current date and time, and 
                     const directionCell = document.createElement('td');
 
                     // Format and populate cell data
-                    dateCell.textContent = formatDate(measurement.timeStamp);
-                    timeCell.textContent = formatTime(measurement.timeStamp);
-                    valueCell.textContent = Math.round(measurement.speed * 100); // Convert m/s to cm/s and round
-                    directionCell.textContent = measurement.direction + " (" + getWindDirection(measurement.direction) + ")";
+                    dateCell.textContent = formatDate(event.timeStamp);
+                    timeCell.textContent = formatTime(event.timeStamp);
+                    valueCell.textContent = Math.round(event.value * 100); // Convert m/s to cm/s and round
+                    directionCell.textContent = events_w[index].value + " (" + getWindDirection(events_w[index].value) + ")";
 
                     // Apply color-coded background based on current strength and slack times
-                    if (measurement.isLowest) {
+                    const value = parseFloat(event.value);
+                    if (event.isLowest) {
                         // Dark green for slack times (minimal current, ideal for diving)
                         row.style.backgroundColor = '#468046'; // darker green
-                    } else if (measurement.isPeak) {
-                        // Dark red for peak currents (maximum current, worst for diving)
-                        row.style.backgroundColor = '#cc0000'; // dark red
-                    } else if (measurement.speed > 0.30) {
+                    } else if (value > 0.30) {
                         // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
-                    } else if (measurement.speed > 0.20) {
+                    } else if (value > 0.20) {
                         // Orange for moderate current (experienced divers only)
                         row.style.backgroundColor = '#ffe6cc'; // light pastel orange
                     } else {
@@ -920,21 +882,10 @@ The dates and times are set to default values of the current date and time, and 
             border: none !important;
             visibility: hidden; /* Make filler completely invisible */
         }
-        .timeline-segment.speed-strong,
-        .timeline-segment.speed-moderate,
-        .timeline-segment.speed-weak {
+        .timeline-segment.speed-30,
+        .timeline-segment.speed-20 {
             border: 1px solid #ddd !important; /* Force border with !important */
         }
-        .timeline-segment.speed-strong {
-            background-color: #ffcccc; /* Red for > 30 cm/s */
-        }
-        .timeline-segment.speed-moderate {
-            background-color: #ffe6cc; /* Orange for 20-30 cm/s */
-        }
-        .timeline-segment.speed-weak {
-            background-color: #ccffcc; /* Green for ≤ 20 cm/s */
-        }
-        /* Legacy support for old class names */
         .timeline-segment.speed-30 {
             background-color: #ffe6cc;
         }
@@ -1064,9 +1015,6 @@ The dates and times are set to default values of the current date and time, and 
         }
         .legend .dark-green {
             background-color: #468046;
-        }
-        .legend .dark-red {
-            background-color: #cc0000;
         }
         /* Loading spinner styles */
         .loading-spinner {
@@ -1360,7 +1308,6 @@ The dates and times are set to default values of the current date and time, and 
         <div><span class="orange"></span> Alleen ervaren getijdenduikers (stroming 20-30 cm/s)</div>
         <div><span class="light-green"></span> Alle getijdenduikers (stroming ≤ 20 cm/s)</div>
         <div><span class="dark-green"></span> Stromingskentering (vrijwel geen stroming)</div>
-        <div><span class="dark-red"></span> Piekstroom (maximale stroming tussen kenteringen)</div>
     </div>
     <div id="dive-windows"></div>
     <div id="results"></div>
