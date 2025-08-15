@@ -762,8 +762,8 @@ The dates and times are set to default values of the current date and time, and 
                         // Dark green for slack times (minimal current, ideal for diving)
                         row.style.backgroundColor = '#468046'; // darker green
                     } else if (measurement.isPeak) {
-                        // Dark red for peak currents (maximum current, worst for diving)
-                        row.style.backgroundColor = '#cc0000'; // dark red
+                        // Light blue for peak currents (maximum current, distinctive but not alarming)
+                        row.style.backgroundColor = '#cce6ff'; // light blue
                     } else if (measurement.speed > 0.30) {
                         // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
@@ -1262,8 +1262,8 @@ The dates and times are set to default values of the current date and time, and 
         .legend .dark-green {
             background-color: #468046;
         }
-        .legend .dark-red {
-            background-color: #cc0000;
+        .legend .light-blue {
+            background-color: #cce6ff;
         }
         /* Loading spinner styles */
         .loading-spinner {
@@ -1563,7 +1563,7 @@ The dates and times are set to default values of the current date and time, and 
         <div><span class="orange"></span> Alleen ervaren getijdenduikers (stroming 20-30 cm/s)</div>
         <div><span class="light-green"></span> Alle getijdenduikers (stroming ≤ 20 cm/s)</div>
         <div><span class="dark-green"></span> Stromingskentering (vrijwel geen stroming)</div>
-        <div><span class="dark-red"></span> Piekstroom (maximale stroming tussen kenteringen)</div>
+        <div><span class="light-blue"></span> Piekstroom (maximale stroming tussen kenteringen)</div>
     </div>
     <div id="dive-windows"></div>
     <div id="results"></div>
