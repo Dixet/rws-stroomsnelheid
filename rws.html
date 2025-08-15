@@ -569,8 +569,8 @@ The dates and times are set to default values of the current date and time, and 
                             const slackContainer = document.createElement('div');
                             slackContainer.style.position = 'absolute';
                             slackContainer.style.left = `${relativePosition}%`;
-                            slackContainer.style.top = '0';
-                            slackContainer.style.height = '100%';
+                            slackContainer.style.top = '-15px'; // Extended upward but stops just below slack label
+                            slackContainer.style.height = '45px'; // Covers from just below slack label to bottom of bar
                             slackContainer.style.transform = 'translateX(-50%)';
                             slackContainer.style.width = '2px';
                             slackContainer.style.backgroundColor = '#006600';
@@ -593,40 +593,29 @@ The dates and times are set to default values of the current date and time, and 
                      * @param {Object} measurement - Measurement object with timeStamp property
                      * @param {number} position - Pixel position for label placement
                      * @param {string} className - CSS class for the label
-                     * @param {number} minDistance - Minimum distance between labels to prevent overlap
+                     * @param {boolean} isStaggered - Whether this label should be positioned higher (staggered)
                      */
-                    const createLabel = (measurement, position, className = 'start', minDistance = 35) => {
+                    const createLabel = (measurement, position, className = 'start', isStaggered = false) => {
                         if (measurement) {
-                            // Check if there's already a label too close to this position
-                            const existingLabels = timeLabels.querySelectorAll('span, .slack-container');
-                            let shouldSkip = false;
-                            
-                            existingLabels.forEach(existingLabel => {
-                                const existingPosition = parseFloat(existingLabel.style.left || 0);
-                                if (Math.abs(position - existingPosition) < minDistance) {
-                                    shouldSkip = true;
-                                }
-                            });
-                            
-                            if (!shouldSkip) {
-                                const label = document.createElement('span');
-                                label.textContent = formatTime(measurement.timeStamp);
-                                label.style.left = `${position}px`;
-                                label.className = className;
-                                timeLabels.appendChild(label);
-                            }
+                            // No overlap checking needed since labels are staggered at different heights
+                            const label = document.createElement('span');
+                            label.textContent = formatTime(measurement.timeStamp);
+                            label.style.left = `${position}px`;
+                            label.className = className + (isStaggered ? ' staggered' : '');
+                            timeLabels.appendChild(label);
                         }
                     };
 
                     // Position labels at key points in the diving window
                     
-                    // Calculate minimum distance between labels based on bar width
-                    const minLabelDistance = Math.max(30, barWidth * 0.05); // At least 30px or 5% of bar width
+                    // Counter for staggering labels
+                    let labelCount = 0;
                     
                     // Start of window label - adjusted for filler using consistent pixel scale
                     const startLabelPosition = fillerDuration > 0 ? 
                         fillerDuration * pixelsPerMinute : 0;
-                    createLabel(window.windowStart, startLabelPosition, 'start', minLabelDistance);
+                    createLabel(window.windowStart, startLabelPosition, 'start', labelCount % 2 === 0);
+                    labelCount++;
 
                     // Add labels for each segment transition, but only if there's enough space
                     let cumulativeDuration = fillerDuration;
@@ -640,7 +629,8 @@ The dates and times are set to default values of the current date and time, and 
                                 Math.abs(new Date(m.timeStamp) - segmentStartTime) < 1000 // Within 1 second
                             );
                             if (transitionMeasurement) {
-                                createLabel(transitionMeasurement, segmentStartPosition, 'transition', minLabelDistance);
+                                createLabel(transitionMeasurement, segmentStartPosition, 'transition', labelCount % 2 === 0);
+                                labelCount++;
                             }
                         }
                         cumulativeDuration += segment.duration;
@@ -649,7 +639,8 @@ The dates and times are set to default values of the current date and time, and 
                     // End of window label using consistent pixel scale
                     const endLabelPosition = fillerDuration > 0 ? 
                         (fillerDuration + window.duration) * pixelsPerMinute : barWidth;
-                    createLabel(window.windowEnd, endLabelPosition, 'end', minLabelDistance);
+                    createLabel(window.windowEnd, endLabelPosition, 'end', labelCount % 2 === 0);
+                    labelCount++;
 
                     // Add special slack time label with tide indicator
                     if (window.slackTime) {
@@ -1016,10 +1007,10 @@ The dates and times are set to default values of the current date and time, and 
         .timeline-row {
             display: flex;
             align-items: flex-start;
-            margin-bottom: 70px; /* Increased vertical spacing between rows to prevent overlap */
+            margin-bottom: 85px; /* Increased from 70px to accommodate raised slack labels */
             overflow: visible;
             position: relative; /* Ensure proper positioning context */
-            padding-top: 35px; /* Increased to ensure labels don't interfere with previous row */
+            padding-top: 50px; /* Increased from 35px to ensure labels don't interfere with previous row */
             min-width: 950px; /* Default minimum width */
         }
         
@@ -1120,7 +1111,7 @@ The dates and times are set to default values of the current date and time, and 
         .timeline-labels {
             position: absolute;
             display: flex;
-            top: -35px;
+            top: -50px; /* Increased to accommodate raised slack labels */
             width: 100%;
             pointer-events: none;
         }
@@ -1128,9 +1119,14 @@ The dates and times are set to default values of the current date and time, and 
             font-size: 0.9em;
             position: absolute;
             white-space: nowrap;
-            top: 15px;
+            top: 30px; /* Lowered from 15px - moved down by 15px */
             transform: translateX(-50%);
             text-shadow: 0 0 3px white; /* Add text shadow to improve readability when labels are close */
+        }
+        
+        /* Staggered labels positioned below the bar */
+        .timeline-labels span.staggered {
+            top: 90px; /* Lowered from 75px - moved down by 15px */
         }
         
         /* Label styling for different types */
@@ -1175,7 +1171,7 @@ The dates and times are set to default values of the current date and time, and 
             display: flex;
             flex-direction: column;
             align-items: center;
-            top: -2px; /* Position tide indicator above the baseline */
+            top: -5px; /* Lowered from -20px - moved down by 15px */
         }
         .tide-indicator {
             color: #468046;
@@ -1191,7 +1187,7 @@ The dates and times are set to default values of the current date and time, and 
             padding: 0 4px;
             white-space: nowrap;
             font-size: 0.8em; /* Explicit font size to match tide-indicator */
-            margin-top: 5px; /* Align with other labels while keeping close to tide indicator */
+            margin-top: 5px; /* Maintain alignment with other labels */
             line-height: 1;
         }
         /* Styles for the main table */
@@ -1369,8 +1365,14 @@ The dates and times are set to default values of the current date and time, and 
 				font-size: 0.8em;
 			}
 			
+			/* Mobile staggered labels positioned below the bar */
+			.timeline-labels span.staggered {
+				top: 85px; /* Lowered from 70px - moved down by 15px */
+			}
+			
 			.slack-container {
 				min-width: 30px;
+				top: 0px; /* Lowered from -15px - moved down by 15px */
 			}
 			
 			.tide-indicator {
