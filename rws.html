@@ -843,29 +843,6 @@ The dates and times are set to default values of the current date and time, and 
         
         // Initialize the page when it loads - set default date/time values
         window.onload = setDefaultDateTime;
-        
-        // Add resize event listener to recalculate timeline widths when window is resized
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            // Debounce resize events to avoid excessive recalculations
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(function() {
-                const resultsContainer = document.getElementById('results');
-                const diveWindowsContainer = document.getElementById('dive-windows');
-                
-                console.log('Resize detected, viewport width:', getViewportWidth()); // Debug log
-                
-                // Only recalculate if we have data displayed
-                if (resultsContainer.innerHTML.trim() !== '' || diveWindowsContainer.innerHTML.trim() !== '') {
-                    // Trigger a data refresh to recalculate with new screen dimensions
-                    // Only if we're not currently loading data
-                    const loadingSpinner = document.getElementById('loading-spinner');
-                    if (loadingSpinner.style.display === 'none') {
-                        fetchData();
-                    }
-                }
-            }, 250); // Wait 250ms after resize stops
-        });
     </script>
     <style>
 		body {
