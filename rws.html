@@ -33,17 +33,22 @@ The dates and times are set to default values of the current date and time, and 
          */
         function setDefaultDateTime() {
             const now = new Date();
-            // Extract date part in YYYY-MM-DD format from ISO string
-            const currentDate = now.toISOString().slice(0, 10);
-            // Extract time part in HH:MM format from time string
-            const currentTime = now.toTimeString().slice(0, 5);
+            // Set start to today at 00:00 local time
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const currentDate = `${year}-${month}-${day}`;
+            const currentTime = '00:00';
             document.getElementById('startDate').value = currentDate;
             document.getElementById('startTime').value = currentTime;
 
-            // Calculate date/time 48 hours (2 days) from now
-            const later = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-            const endDate = later.toISOString().slice(0, 10);
-            const endTime = later.toTimeString().slice(0, 5);
+            // Set end to 48 hours after start (i.e., two days later at 00:00 local time)
+            const endDateObj = new Date(year, now.getMonth(), now.getDate() + 2, 0, 0, 0, 0);
+            const endYear = endDateObj.getFullYear();
+            const endMonth = String(endDateObj.getMonth() + 1).padStart(2, '0');
+            const endDay = String(endDateObj.getDate()).padStart(2, '0');
+            const endDate = `${endYear}-${endMonth}-${endDay}`;
+            const endTime = '00:00';
             document.getElementById('endDate').value = endDate;
             document.getElementById('endTime').value = endTime;
         }
