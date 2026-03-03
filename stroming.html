@@ -638,7 +638,7 @@ The dates and times are set to default values of the current date and time, and 
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
                 // Check if conditions are favorable throughout the entire period
-                const allSpeedsLow = currentMeasurements.every(measurement => measurement.speed <= 0.3);
+                const allSpeedsLow = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.3);
                 
                 if (allSpeedsLow) {
                     // Create favorable conditions info panel
