@@ -1096,8 +1096,8 @@ The dates and times are set to default values of the current date and time, and 
                         // Dark green for slack times (minimal current, ideal for diving)
                         row.style.backgroundColor = '#468046'; // darker green
                     } else if (measurement.isPeak) {
-                        // Light blue for peak currents (maximum current, distinctive but not alarming)
-                        row.style.backgroundColor = '#cce6ff'; // light blue
+                        // Light purple for peak currents (maximum current, distinctive but not alarming)
+                        row.style.backgroundColor = '#b296f5'; // light purple
                     } else if (measurement.speed > 0.30) {
                         // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
@@ -1527,14 +1527,14 @@ The dates and times are set to default values of the current date and time, and 
             border-bottom-right-radius: 4px;
         }
         
-        /* First segment (peak tide boundary) gets light blue left border */
+        /* First segment (peak tide boundary) gets purple left border */
         .timeline-segment.first-segment {
-            border-left: 3px solid #cce6ff !important;
+            border-left: 3px solid #b296f5 !important;
         }
         
-        /* Last segment (peak tide boundary) gets light blue right border */
+        /* Last segment (peak tide boundary) gets purple right border */
         .timeline-segment.last-segment {
-            border-right: 3px solid #cce6ff !important;
+            border-right: 3px solid #b296f5 !important;
         }
         .timeline-labels {
             position: absolute;
@@ -1691,7 +1691,7 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #468046;
         }
         .legend .light-blue {
-            background-color: #cce6ff;
+            background-color: #b296f5;
         }
         /* Loading spinner styles */
         .loading-spinner {
