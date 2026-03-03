@@ -97,6 +97,95 @@ The dates and times are set to default values of the current date and time, and 
                 }
             }
         }
+
+        let availableDiveSites = [];
+
+        /**
+         * Renders dive site options based on the checkbox filter state.
+         */
+        function renderDiveSites() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
+
+            if (!diveSiteSelect || !onlyDiveLocationsCheckbox) {
+                return;
+            }
+
+            const showOnlyDiveLocations = onlyDiveLocationsCheckbox.checked;
+            const filteredLocations = showOnlyDiveLocations
+                ? availableDiveSites.filter(location => location.name.toLowerCase().includes('duiklocatie'))
+                : availableDiveSites;
+
+            diveSiteSelect.innerHTML = '';
+
+            if (filteredLocations.length === 0) {
+                diveSiteSelect.innerHTML = '<option value="" selected disabled>Geen duikplaatsen beschikbaar</option>';
+                diveSiteSelect.disabled = true;
+                return;
+            }
+
+            filteredLocations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = location.name;
+                diveSiteSelect.appendChild(option);
+            });
+
+            diveSiteSelect.disabled = false;
+            diveSiteSelect.selectedIndex = 0;
+        }
+
+        /**
+         * Loads available dive sites from the RWS locations API and fills the dive site select list.
+         * Uses feature.properties.locationName as label and feature.properties.id as value.
+         */
+        async function loadDiveSites() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            if (!diveSiteSelect) {
+                return;
+            }
+
+            const locationsUrl = 'https://rwsos.rws.nl/wb-api/dd/2.0/locations/geojson?sourceName=compute&observationTypeId=SG_SOF_6.1.ms&boundingBox=%5B3.4%2C51.45%2C4.3%2C51.8%5D&';
+
+            diveSiteSelect.disabled = true;
+            diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen laden...</option>';
+
+            try {
+                const response = await fetch(locationsUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+
+                const data = await response.json();
+                const features = Array.isArray(data.features) ? data.features : [];
+
+                const locations = features
+                    .map(feature => {
+                        const properties = feature?.properties || {};
+                        return {
+                            id: properties.id,
+                            name: properties.locationName || properties.locationname
+                        };
+                    })
+                    .filter(location => location.id && location.name)
+                    .sort((a, b) => a.name.localeCompare(b.name, 'nl-NL'));
+
+                if (locations.length === 0) {
+                    throw new Error('No dive sites returned by API');
+                }
+
+                availableDiveSites = locations;
+                renderDiveSites();
+            } catch (error) {
+                console.error('Error loading dive sites:', error);
+                diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen niet beschikbaar</option>';
+                diveSiteSelect.disabled = true;
+            } finally {
+                if (availableDiveSites.length > 0) {
+                    diveSiteSelect.disabled = false;
+                }
+            }
+        }
         /**
          * Converts degrees (0-360) to wind direction abbreviation (N, NE, E, SE, S, SW, W, NW).
          * Uses mathematical calculation instead of array lookup for better performance.
@@ -911,9 +1000,18 @@ The dates and times are set to default values of the current date and time, and 
             const startDateInput = document.getElementById('startDate');
             const startTimeInput = document.getElementById('startTime');
             const endDateInput = document.getElementById('endDate');
+            const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
+                    diveWindowsContainer.innerHTML = '';
+                    resultsContainer.innerHTML = '';
+                });
+            }
+
+            if (onlyDiveLocationsCheckbox && diveWindowsContainer && resultsContainer) {
+                onlyDiveLocationsCheckbox.addEventListener('change', () => {
+                    renderDiveSites();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
@@ -930,6 +1028,8 @@ The dates and times are set to default values of the current date and time, and 
             if (endDateInput) {
                 endDateInput.addEventListener('change', syncEndDateTimeConstraints);
             }
+
+            loadDiveSites();
         };
     </script>
     <style>
@@ -970,6 +1070,22 @@ The dates and times are set to default values of the current date and time, and 
 			color: #34495e;
 			font-size: 0.95em;
 		}
+        .dive-site-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .checkbox-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: normal;
+        }
+        .checkbox-inline input[type="checkbox"] {
+            margin: 0;
+        }
 		input[type="date"], input[type="time"], select {
 			padding: 10px;
 			border: 2px solid #e1e8ed;
@@ -1031,10 +1147,14 @@ The dates and times are set to default values of the current date and time, and 
 				text-align: center;
 			}
 			
-			/* Ensure form elements are left-aligned on smaller screens */
+            /* Ensure form elements are left-aligned on smaller screens */
 			label {
 				text-align: left;
 			}
+
+            .dive-site-label {
+                justify-content: flex-start;
+            }
 			
 			input[type="date"], input[type="time"], select {
 				text-align: left;
@@ -1573,44 +1693,17 @@ The dates and times are set to default values of the current date and time, and 
     <form onsubmit="event.preventDefault(); fetchData();">
         <div class="form-row">
             <div class="form-group">
-                <label for="diveSite">Duikplaats:</label>
+                <div class="dive-site-label">
+                    <label for="diveSite">
+                    <span>Duikplaats:</span>
+                    </label>
+                    <label for="onlyDiveLocations" class="checkbox-inline">
+                        <input type="checkbox" id="onlyDiveLocations" checked>
+                        <span>Toon alleen duiklocaties</span>
+                    </label>
+                </div>
                 <select id="diveSite" required>
-            <option value="burgd">Burghsluis</option>
-            <option value="cpdl">Colijnsplaat</option>
-            <option value="dypc">Dicky’s Place/Gemaal</option>
-            <option value="dhdk">Dishoek</option>
-            <option value="flauw">Flauwers</option>
-            <option value="stvbevp">Goese Sas</option>
-            <option value="ghdk">Gorishoek</option>
-            <option value="hfwk">Havenhoofd West/Kurkenol</option>
-            <option value="irhe">Irenehoeve</option>
-            <option value="katsh">Katshoek</option>
-            <option value="stvwemew">Kattendijke Parking</option>
-            <option value="kstl">Kistersnol</option>
-            <option value="lvnsd">Levensstrijd</option>
-            <option value="oesp">Oesterputen</option>
-            <option value="pltn">Plompe Toren</option>
-            <option value="o11">Putti’s Place</option>
-            <option value="quack">Quaack/Het oude Dorp</option>
-            <option value="stvschk">Schelphoek</option>
-            <option value="sphn">Sophiahaven</option>
-            <option value="spak">Spyros Amenakis</option>
-            <option value="stald">St Annaland</option>
-            <option value="ston">Stavenisse Oostnol</option>
-            <option value="stsgr">Stavenisse Steiger</option>
-            <option value="strd">Strijenham</option>
-            <option value="vlie">Vlietepolder</option>
-            <option value="vlblt">Vuilnisbelt</option>
-            <option value="grb">Wd De Groene Boei</option>
-            <option value="dhoek">Wd De Hoek/Galjoen</option>
-            <option value="wdoo">Wemeldinge Oost/Linda</option>
-            <option value="wkkm">Westkapelle KNRM</option>
-            <option value="znp1">Zeelandbrug 1e pijler</option>
-            <option value="znp2">Zeelandbrug 2e pijler</option>
-            <option value="zpmn">Zijpe (Midden)</option>
-            <option value="znsn">Zonneschijn</option>
-            <option value="zodk">Zoutelande</option>
-            <option value="zubt">Zuidbout</option>
+                    <option value="" selected disabled>Duikplaatsen laden...</option>
                 </select>
             </div>
         </div>
