@@ -133,10 +133,10 @@ The dates and times are set to default values of the current date and time, and 
 
                 const marker = L.circleMarker([location.latitude, location.longitude], {
                     radius: 4,
-                    color: isDiveLocation ? '#2c3e50' : '#7f8c8d',
+                    color: isDiveLocation ? '#1e3a8a' : '#607d8b',
                     weight: 1,
-                    fillColor: isDiveLocation ? '#3498db' : '#cfd8dc',
-                    fillOpacity: isDiveLocation ? 0.9 : 0.8
+                    fillColor: isDiveLocation ? '#2563eb' : '#90a4ae',
+                    fillOpacity: isDiveLocation ? 0.95 : 0.85
                 });
                 marker.bindPopup(location.name);
                 diveSiteMarkersLayer.addLayer(marker);
