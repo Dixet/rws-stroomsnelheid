@@ -1094,10 +1094,10 @@ The dates and times are set to default values of the current date and time, and 
                     // Apply color-coded background based on current strength and slack times
                     if (measurement.isLowest) {
                         // Dark green for slack times (minimal current, ideal for diving)
-                        row.style.backgroundColor = '#468046'; // darker green
+                        row.style.backgroundColor = '#81bd81'; // darker green
                     } else if (measurement.isPeak) {
                         // Light purple for peak currents (maximum current, distinctive but not alarming)
-                        row.style.backgroundColor = '#b296f5'; // light purple
+                        row.style.backgroundColor = '#c47878'; // light purple
                     } else if (measurement.speed > 0.30) {
                         // Red for strong current (diving not recommended)
                         row.style.backgroundColor = '#ffcccc'; // light pastel red
@@ -1529,12 +1529,12 @@ The dates and times are set to default values of the current date and time, and 
         
         /* First segment (peak tide boundary) gets purple left border */
         .timeline-segment.first-segment {
-            border-left: 3px solid #b296f5 !important;
+            border-left: 3px solid #c47878 !important;
         }
         
         /* Last segment (peak tide boundary) gets purple right border */
         .timeline-segment.last-segment {
-            border-right: 3px solid #b296f5 !important;
+            border-right: 3px solid #c47878 !important;
         }
         .timeline-labels {
             position: absolute;
@@ -1602,7 +1602,7 @@ The dates and times are set to default values of the current date and time, and 
             top: -5px; /* Lowered from -20px - moved down by 15px */
         }
         .tide-indicator {
-            color: #468046;
+            color: #81bd81;
             font-weight: bold;
             margin-bottom: 0px; /* Remove space between tide indicator and slack time */
             font-size: 0.8em; /* Match slack-time font size */
@@ -1610,7 +1610,7 @@ The dates and times are set to default values of the current date and time, and 
             line-height: 1;
         }
         .slack-time {
-            color: #468046;
+            color: #81bd81;
             font-weight: bold;
             padding: 0 4px;
             white-space: nowrap;
@@ -1688,10 +1688,10 @@ The dates and times are set to default values of the current date and time, and 
             background-color: #ccffcc;
         }
         .legend .dark-green {
-            background-color: #468046;
+            background-color: #81bd81;
         }
         .legend .light-blue {
-            background-color: #b296f5;
+            background-color: #c47878;
         }
         /* Loading spinner styles */
         .loading-spinner {
