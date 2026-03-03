@@ -114,6 +114,51 @@ The dates and times are set to default values of the current date and time, and 
         let diveSiteMarkersLayer = null;
 
         /**
+         * Returns map marker style based on location type and selection state.
+         * @param {boolean} isDiveLocation - True when location name contains 'duiklocatie'
+         * @param {boolean} isSelected - True when marker matches current dropdown selection
+         * @returns {Object} Leaflet circleMarker style
+         */
+        function getMarkerStyle(isDiveLocation, isSelected) {
+            if (isSelected) {
+                return {
+                    radius: 6,
+                    color: '#0f172a',
+                    weight: 2,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.98
+                };
+            }
+
+            return {
+                radius: 4,
+                color: isDiveLocation ? '#1e3a8a' : '#607d8b',
+                weight: 1,
+                fillColor: isDiveLocation ? '#2563eb' : '#90a4ae',
+                fillOpacity: isDiveLocation ? 0.95 : 0.85
+            };
+        }
+
+        /**
+         * Highlights the selected location marker to match the dropdown value.
+         */
+        function updateSelectedMarkerHighlight() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            if (!diveSiteSelect || !diveSiteMarkersLayer) {
+                return;
+            }
+
+            const selectedLocationId = diveSiteSelect.value;
+
+            diveSiteMarkersLayer.eachLayer(marker => {
+                const markerLocationId = marker.locationId;
+                const isDiveLocation = marker.isDiveLocation === true;
+                const isSelected = markerLocationId === selectedLocationId;
+                marker.setStyle(getMarkerStyle(isDiveLocation, isSelected));
+            });
+        }
+
+        /**
          * Updates map markers to match the currently visible dive site list.
          * @param {Array} locations - Filtered location list
          */
@@ -131,13 +176,9 @@ The dates and times are set to default values of the current date and time, and 
 
                 const isDiveLocation = location.name.toLowerCase().includes('duiklocatie');
 
-                const marker = L.circleMarker([location.latitude, location.longitude], {
-                    radius: 4,
-                    color: isDiveLocation ? '#1e3a8a' : '#607d8b',
-                    weight: 1,
-                    fillColor: isDiveLocation ? '#2563eb' : '#90a4ae',
-                    fillOpacity: isDiveLocation ? 0.95 : 0.85
-                });
+                const marker = L.circleMarker([location.latitude, location.longitude], getMarkerStyle(isDiveLocation, false));
+                marker.locationId = location.id;
+                marker.isDiveLocation = isDiveLocation;
                 marker.bindPopup(location.name);
                 marker.on('click', () => {
                     const diveSiteSelect = document.getElementById('diveSite');
@@ -155,6 +196,8 @@ The dates and times are set to default values of the current date and time, and 
                 });
                 diveSiteMarkersLayer.addLayer(marker);
             });
+
+            updateSelectedMarkerHighlight();
         }
 
         /**
@@ -216,6 +259,7 @@ The dates and times are set to default values of the current date and time, and 
 
             diveSiteSelect.disabled = false;
             diveSiteSelect.selectedIndex = 0;
+            updateSelectedMarkerHighlight();
         }
 
         /**
@@ -1098,6 +1142,7 @@ The dates and times are set to default values of the current date and time, and 
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
+                    updateSelectedMarkerHighlight();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
