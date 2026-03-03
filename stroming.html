@@ -174,7 +174,7 @@ The dates and times are set to default values of the current date and time, and 
                     return;
                 }
 
-                const isDiveLocation = location.name.toLowerCase().includes('duiklocatie');
+                const isDiveLocation = location.isDiveLocation === true;
 
                 const marker = L.circleMarker([location.latitude, location.longitude], getMarkerStyle(isDiveLocation, false));
                 marker.locationId = location.id;
@@ -237,7 +237,7 @@ The dates and times are set to default values of the current date and time, and 
 
             const showOnlyDiveLocations = onlyDiveLocationsCheckbox.checked;
             const filteredLocations = showOnlyDiveLocations
-                ? availableDiveSites.filter(location => location.name.toLowerCase().includes('duiklocatie'))
+                ? availableDiveSites.filter(location => location.isDiveLocation)
                 : availableDiveSites;
 
             renderMapMarkers(filteredLocations);
@@ -293,9 +293,17 @@ The dates and times are set to default values of the current date and time, and 
                             ? feature.geometry.coordinates
                             : [];
 
+                        const originalName = String(properties.locationName || properties.locationname || '').trim();
+                        const isDiveLocation = /\([^)]*duiklocatie[^)]*\)/i.test(originalName);
+                        const cleanedName = originalName
+                            .replace(/\s*\([^)]*\)\s*/g, ' ')
+                            .replace(/\s{2,}/g, ' ')
+                            .trim();
+
                         return {
                             id: properties.id,
-                            name: properties.locationName || properties.locationname,
+                            name: cleanedName,
+                            isDiveLocation: isDiveLocation,
                             longitude: Number(coordinates[0]),
                             latitude: Number(coordinates[1])
                         };
