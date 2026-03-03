@@ -98,6 +98,43 @@ The dates and times are set to default values of the current date and time, and 
             }
         }
 
+        let availableDiveSites = [];
+
+        /**
+         * Renders dive site options based on the checkbox filter state.
+         */
+        function renderDiveSites() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
+
+            if (!diveSiteSelect || !onlyDiveLocationsCheckbox) {
+                return;
+            }
+
+            const showOnlyDiveLocations = onlyDiveLocationsCheckbox.checked;
+            const filteredLocations = showOnlyDiveLocations
+                ? availableDiveSites.filter(location => location.name.toLowerCase().includes('duiklocatie'))
+                : availableDiveSites;
+
+            diveSiteSelect.innerHTML = '';
+
+            if (filteredLocations.length === 0) {
+                diveSiteSelect.innerHTML = '<option value="" selected disabled>Geen duikplaatsen beschikbaar</option>';
+                diveSiteSelect.disabled = true;
+                return;
+            }
+
+            filteredLocations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = location.name;
+                diveSiteSelect.appendChild(option);
+            });
+
+            diveSiteSelect.disabled = false;
+            diveSiteSelect.selectedIndex = 0;
+        }
+
         /**
          * Loads available dive sites from the RWS locations API and fills the dive site select list.
          * Uses feature.properties.locationName as label and feature.properties.id as value.
@@ -137,18 +174,16 @@ The dates and times are set to default values of the current date and time, and 
                     throw new Error('No dive sites returned by API');
                 }
 
-                diveSiteSelect.innerHTML = '';
-                locations.forEach(location => {
-                    const option = document.createElement('option');
-                    option.value = location.id;
-                    option.textContent = location.name;
-                    diveSiteSelect.appendChild(option);
-                });
+                availableDiveSites = locations;
+                renderDiveSites();
             } catch (error) {
                 console.error('Error loading dive sites:', error);
                 diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen niet beschikbaar</option>';
+                diveSiteSelect.disabled = true;
             } finally {
-                diveSiteSelect.disabled = diveSiteSelect.options.length === 0 || !diveSiteSelect.value;
+                if (availableDiveSites.length > 0) {
+                    diveSiteSelect.disabled = false;
+                }
             }
         }
         /**
@@ -965,9 +1000,18 @@ The dates and times are set to default values of the current date and time, and 
             const startDateInput = document.getElementById('startDate');
             const startTimeInput = document.getElementById('startTime');
             const endDateInput = document.getElementById('endDate');
+            const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
+                    diveWindowsContainer.innerHTML = '';
+                    resultsContainer.innerHTML = '';
+                });
+            }
+
+            if (onlyDiveLocationsCheckbox && diveWindowsContainer && resultsContainer) {
+                onlyDiveLocationsCheckbox.addEventListener('change', () => {
+                    renderDiveSites();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
@@ -1026,6 +1070,22 @@ The dates and times are set to default values of the current date and time, and 
 			color: #34495e;
 			font-size: 0.95em;
 		}
+        .dive-site-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .checkbox-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: normal;
+        }
+        .checkbox-inline input[type="checkbox"] {
+            margin: 0;
+        }
 		input[type="date"], input[type="time"], select {
 			padding: 10px;
 			border: 2px solid #e1e8ed;
@@ -1087,10 +1147,14 @@ The dates and times are set to default values of the current date and time, and 
 				text-align: center;
 			}
 			
-			/* Ensure form elements are left-aligned on smaller screens */
+            /* Ensure form elements are left-aligned on smaller screens */
 			label {
 				text-align: left;
 			}
+
+            .dive-site-label {
+                justify-content: flex-start;
+            }
 			
 			input[type="date"], input[type="time"], select {
 				text-align: left;
@@ -1629,7 +1693,15 @@ The dates and times are set to default values of the current date and time, and 
     <form onsubmit="event.preventDefault(); fetchData();">
         <div class="form-row">
             <div class="form-group">
-                <label for="diveSite">Duikplaats:</label>
+                <div class="dive-site-label">
+                    <label for="diveSite">
+                    <span>Duikplaats:</span>
+                    </label>
+                    <label for="onlyDiveLocations" class="checkbox-inline">
+                        <input type="checkbox" id="onlyDiveLocations" checked>
+                        <span>Toon alleen duiklocaties</span>
+                    </label>
+                </div>
                 <select id="diveSite" required>
                     <option value="" selected disabled>Duikplaatsen laden...</option>
                 </select>
