@@ -303,6 +303,7 @@ The dates and times are set to default values of the current date and time, and 
                         return {
                             id: properties.id,
                             name: cleanedName,
+                            fullName: originalName,
                             isDiveLocation: isDiveLocation,
                             longitude: Number(coordinates[0]),
                             latitude: Number(coordinates[1])
@@ -376,7 +377,8 @@ The dates and times are set to default values of the current date and time, and 
             const endTime = document.getElementById('endTime').value;
             const diveSiteSelect = document.getElementById('diveSite');
             const diveSite = diveSiteSelect.value;
-            const diveSiteName = diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
+            const selectedLocation = availableDiveSites.find(location => location.id === diveSite);
+            const diveSiteName = selectedLocation?.fullName || diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
 
             const startDateTime = new Date(`${startDate}T${startTime}:00`);
             const endDateTime = new Date(`${endDate}T${endTime}:00`);
