@@ -51,6 +51,51 @@ The dates and times are set to default values of the current date and time, and 
             const endTime = '00:00';
             document.getElementById('endDate').value = endDate;
             document.getElementById('endTime').value = endTime;
+
+            syncEndDateTimeConstraints();
+        }
+
+        /**
+         * Keep end date/time constrained so it cannot be before the selected start date/time.
+         * Also auto-corrects existing end values when start moves forward.
+         */
+        function syncEndDateTimeConstraints() {
+            const startDateInput = document.getElementById('startDate');
+            const startTimeInput = document.getElementById('startTime');
+            const endDateInput = document.getElementById('endDate');
+            const endTimeInput = document.getElementById('endTime');
+
+            if (!startDateInput || !startTimeInput || !endDateInput || !endTimeInput) {
+                return;
+            }
+
+            const startDate = startDateInput.value;
+            const startTime = startTimeInput.value;
+            const endDate = endDateInput.value;
+            const endTime = endTimeInput.value;
+
+            if (!startDate || !startTime) {
+                return;
+            }
+
+            endDateInput.min = startDate;
+
+            if (endDate === startDate) {
+                endTimeInput.min = startTime;
+            } else {
+                endTimeInput.removeAttribute('min');
+            }
+
+            if (endDate && endTime) {
+                const startDateTime = new Date(`${startDate}T${startTime}:00`);
+                const endDateTime = new Date(`${endDate}T${endTime}:00`);
+
+                if (endDateTime < startDateTime) {
+                    endDateInput.value = startDate;
+                    endTimeInput.value = startTime;
+                    endTimeInput.min = startTime;
+                }
+            }
         }
         /**
          * Converts degrees (0-360) to wind direction abbreviation (N, NE, E, SE, S, SW, W, NW).
@@ -97,6 +142,14 @@ The dates and times are set to default values of the current date and time, and 
             const diveSiteSelect = document.getElementById('diveSite');
             const diveSite = diveSiteSelect.value;
             const diveSiteName = diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
+
+            const startDateTime = new Date(`${startDate}T${startTime}:00`);
+            const endDateTime = new Date(`${endDate}T${endTime}:00`);
+            if (endDateTime < startDateTime) {
+                loadingSpinner.style.display = 'none';
+                resultsContainer.textContent = 'Einddatum/tijd kan niet vóór startdatum/tijd liggen.';
+                return;
+            }
 
             // Construct ISO datetime strings from separate date and time inputs
             // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
@@ -855,12 +908,27 @@ The dates and times are set to default values of the current date and time, and 
             const diveSiteSelect = document.getElementById('diveSite');
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
+            const startDateInput = document.getElementById('startDate');
+            const startTimeInput = document.getElementById('startTime');
+            const endDateInput = document.getElementById('endDate');
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
+            }
+
+            if (startDateInput) {
+                startDateInput.addEventListener('change', syncEndDateTimeConstraints);
+            }
+
+            if (startTimeInput) {
+                startTimeInput.addEventListener('change', syncEndDateTimeConstraints);
+            }
+
+            if (endDateInput) {
+                endDateInput.addEventListener('change', syncEndDateTimeConstraints);
             }
         };
     </script>
