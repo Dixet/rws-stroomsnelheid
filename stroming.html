@@ -94,7 +94,9 @@ The dates and times are set to default values of the current date and time, and 
             const startTime = document.getElementById('startTime').value;
             const endDate = document.getElementById('endDate').value;
             const endTime = document.getElementById('endTime').value;
-            const diveSite = document.getElementById('diveSite').value;
+            const diveSiteSelect = document.getElementById('diveSite');
+            const diveSite = diveSiteSelect.value;
+            const diveSiteName = diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
 
             // Construct ISO datetime strings from separate date and time inputs
             // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
@@ -121,7 +123,7 @@ The dates and times are set to default values of the current date and time, and 
                 const data_w = await response_w.json();
                 
                 // Process and display the fetched data
-                displayResults(data, data_w);
+                displayResults(data, data_w, diveSiteName);
             } catch (error) {
                 // Handle network errors, API errors, or JSON parsing errors
                 console.error('Error fetching data:', error);
@@ -138,7 +140,7 @@ The dates and times are set to default values of the current date and time, and 
          * @param {Object} data - Speed data from RWS API containing current measurements in m/s
          * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
          */
-        function displayResults(data ,data_w) {
+        function displayResults(data ,data_w, diveSiteName) {
             const diveWindowsContainer = document.getElementById('dive-windows');
             const resultsContainer = document.getElementById('results');
             const legend = document.querySelector('.legend');
@@ -315,7 +317,7 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Add header for dive windows section
                 const diveWindowsHeader = document.createElement('h2');
-                diveWindowsHeader.textContent = 'Duikvensters';
+                diveWindowsHeader.textContent = `Duikvensters - ${diveSiteName}`;
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
                 // Check if conditions are favorable throughout the entire period
@@ -846,8 +848,21 @@ The dates and times are set to default values of the current date and time, and 
             return strUTCFormatted; 
         }
         
-        // Initialize the page when it loads - set default date/time values
-        window.onload = setDefaultDateTime;
+        // Initialize the page when it loads - set default date/time values and UI behavior
+        window.onload = function() {
+            setDefaultDateTime();
+
+            const diveSiteSelect = document.getElementById('diveSite');
+            const diveWindowsContainer = document.getElementById('dive-windows');
+            const resultsContainer = document.getElementById('results');
+
+            if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
+                diveSiteSelect.addEventListener('change', () => {
+                    diveWindowsContainer.innerHTML = '';
+                    resultsContainer.innerHTML = '';
+                });
+            }
+        };
     </script>
     <style>
 		body {
