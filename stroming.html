@@ -1723,8 +1723,19 @@ The dates and times are set to default values of the current date and time, and 
 			text-align: center;
 			font-size: 12px; /* adjust the font size as needed */
 			border-top: 1px solid #ccc; /* optional border at the top */
+            border-bottom: 1px solid #ccc;
 			margin-top: 20px;
 		}
+        #source .disclaimer-title {
+            display: block;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        #source .disclaimer-text {
+            display: block;
+            line-height: 1.5;
+        }
 		
 		/* Mobile responsive styles */
 		@media (max-width: 480px) {
@@ -1974,6 +1985,9 @@ The dates and times are set to default values of the current date and time, and 
     </div>
     <div id="dive-windows"></div>
     <div id="results"></div>
-	<div id="source">De informatie op deze pagina komt van <a href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat Waterberichtgeving</a> en wordt weergegeven zoals deze is, zonder enige garanties.<div>
+    <div id="source">
+        <span class="disclaimer-title">Disclaimer</span>
+        <span class="disclaimer-text">De stromingsgegevens op deze pagina zijn afkomstig van <a href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat Waterberichtgeving</a> en worden uitsluitend ter informatie aangeboden. Aan de weergegeven informatie kunnen geen rechten worden ontleend.<br>Duiken in de Oosterschelde brengt risico's met zich mee. Elke duiker is zelf verantwoordelijk voor een veilige duikplanning en dient de lokale omstandigheden — waaronder stroming, zicht, weer en getij — altijd ter plaatse te beoordelen voordat er wordt gedoken. Deze pagina vervangt niet het eigen oordeelsvermogen van de duiker.</span>
+    </div>
 </body>
 </html>
