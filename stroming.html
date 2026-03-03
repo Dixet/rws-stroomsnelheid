@@ -111,6 +111,37 @@ The dates and times are set to default values of the current date and time, and 
 
         let availableDiveSites = [];
         let diveMap = null;
+        let diveSiteMarkersLayer = null;
+
+        /**
+         * Updates map markers to match the currently visible dive site list.
+         * @param {Array} locations - Filtered location list
+         */
+        function renderMapMarkers(locations) {
+            if (!diveMap || !diveSiteMarkersLayer) {
+                return;
+            }
+
+            diveSiteMarkersLayer.clearLayers();
+
+            locations.forEach(location => {
+                if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) {
+                    return;
+                }
+
+                const isDiveLocation = location.name.toLowerCase().includes('duiklocatie');
+
+                const marker = L.circleMarker([location.latitude, location.longitude], {
+                    radius: 4,
+                    color: isDiveLocation ? '#2c3e50' : '#7f8c8d',
+                    weight: 1,
+                    fillColor: isDiveLocation ? '#3498db' : '#cfd8dc',
+                    fillOpacity: isDiveLocation ? 0.9 : 0.8
+                });
+                marker.bindPopup(location.name);
+                diveSiteMarkersLayer.addLayer(marker);
+            });
+        }
 
         /**
          * Initializes the interactive OpenStreetMap view for the configured bounding box.
@@ -129,6 +160,11 @@ The dates and times are set to default values of the current date and time, and 
             }).addTo(diveMap);
 
             diveMap.setView([51.56085, 3.97018], 10);
+            diveSiteMarkersLayer = L.layerGroup().addTo(diveMap);
+
+            if (availableDiveSites.length > 0) {
+                renderDiveSites();
+            }
         }
 
         /**
@@ -146,6 +182,8 @@ The dates and times are set to default values of the current date and time, and 
             const filteredLocations = showOnlyDiveLocations
                 ? availableDiveSites.filter(location => location.name.toLowerCase().includes('duiklocatie'))
                 : availableDiveSites;
+
+            renderMapMarkers(filteredLocations);
 
             diveSiteSelect.innerHTML = '';
 
@@ -193,12 +231,23 @@ The dates and times are set to default values of the current date and time, and 
                 const locations = features
                     .map(feature => {
                         const properties = feature?.properties || {};
+                        const coordinates = Array.isArray(feature?.geometry?.coordinates)
+                            ? feature.geometry.coordinates
+                            : [];
+
                         return {
                             id: properties.id,
-                            name: properties.locationName || properties.locationname
+                            name: properties.locationName || properties.locationname,
+                            longitude: Number(coordinates[0]),
+                            latitude: Number(coordinates[1])
                         };
                     })
-                    .filter(location => location.id && location.name)
+                    .filter(location =>
+                        location.id &&
+                        location.name &&
+                        Number.isFinite(location.longitude) &&
+                        Number.isFinite(location.latitude)
+                    )
                     .sort((a, b) => a.name.localeCompare(b.name, 'nl-NL'));
 
                 if (locations.length === 0) {
