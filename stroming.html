@@ -159,6 +159,33 @@ The dates and times are set to default values of the current date and time, and 
         }
 
         /**
+         * Opens the popup for the location selected in the dropdown and closes any previous popup.
+         */
+        function openSelectedMarkerPopup() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            if (!diveSiteSelect || !diveSiteMarkersLayer || !diveMap) {
+                return;
+            }
+
+            const selectedLocationId = diveSiteSelect.value;
+            if (!selectedLocationId) {
+                return;
+            }
+
+            let selectedMarker = null;
+            diveSiteMarkersLayer.eachLayer(marker => {
+                if (marker.locationId === selectedLocationId) {
+                    selectedMarker = marker;
+                }
+            });
+
+            if (selectedMarker) {
+                diveMap.closePopup();
+                selectedMarker.openPopup();
+            }
+        }
+
+        /**
          * Updates map markers to match the currently visible dive site list.
          * @param {Array} locations - Filtered location list
          */
@@ -1153,6 +1180,7 @@ The dates and times are set to default values of the current date and time, and 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
                     updateSelectedMarkerHighlight();
+                    openSelectedMarkerPopup();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
