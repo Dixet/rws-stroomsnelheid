@@ -14,6 +14,17 @@ The dates and times are set to default values of the current date and time, and 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Duikstek stroming</title>
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+    </script>
     <script>
         /**
          * Get the current viewport width using multiple methods for better browser compatibility
@@ -99,6 +110,119 @@ The dates and times are set to default values of the current date and time, and 
         }
 
         let availableDiveSites = [];
+        let diveMap = null;
+        let diveSiteMarkersLayer = null;
+
+        /**
+         * Returns map marker style based on location type and selection state.
+         * @param {boolean} isDiveLocation - True when location name contains 'duiklocatie'
+         * @param {boolean} isSelected - True when marker matches current dropdown selection
+         * @returns {Object} Leaflet circleMarker style
+         */
+        function getMarkerStyle(isDiveLocation, isSelected) {
+            if (isSelected) {
+                return {
+                    radius: 8,
+                    color: '#0f172a',
+                    weight: 2,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.98
+                };
+            }
+
+            return {
+                radius: 6,
+                color: isDiveLocation ? '#1e3a8a' : '#607d8b',
+                weight: 1,
+                fillColor: isDiveLocation ? '#2563eb' : '#90a4ae',
+                fillOpacity: isDiveLocation ? 0.95 : 0.85
+            };
+        }
+
+        /**
+         * Highlights the selected location marker to match the dropdown value.
+         */
+        function updateSelectedMarkerHighlight() {
+            const diveSiteSelect = document.getElementById('diveSite');
+            if (!diveSiteSelect || !diveSiteMarkersLayer) {
+                return;
+            }
+
+            const selectedLocationId = diveSiteSelect.value;
+
+            diveSiteMarkersLayer.eachLayer(marker => {
+                const markerLocationId = marker.locationId;
+                const isDiveLocation = marker.isDiveLocation === true;
+                const isSelected = markerLocationId === selectedLocationId;
+                marker.setStyle(getMarkerStyle(isDiveLocation, isSelected));
+            });
+        }
+
+        /**
+         * Updates map markers to match the currently visible dive site list.
+         * @param {Array} locations - Filtered location list
+         */
+        function renderMapMarkers(locations) {
+            if (!diveMap || !diveSiteMarkersLayer) {
+                return;
+            }
+
+            diveSiteMarkersLayer.clearLayers();
+
+            locations.forEach(location => {
+                if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) {
+                    return;
+                }
+
+                const isDiveLocation = location.isDiveLocation === true;
+
+                const marker = L.circleMarker([location.latitude, location.longitude], getMarkerStyle(isDiveLocation, false));
+                marker.locationId = location.id;
+                marker.isDiveLocation = isDiveLocation;
+                marker.bindPopup(location.name);
+                marker.on('click', () => {
+                    const diveSiteSelect = document.getElementById('diveSite');
+                    if (!diveSiteSelect) {
+                        return;
+                    }
+
+                    const optionExists = Array.from(diveSiteSelect.options).some(option => option.value === location.id);
+                    if (!optionExists) {
+                        return;
+                    }
+
+                    diveSiteSelect.value = location.id;
+                    diveSiteSelect.dispatchEvent(new Event('change'));
+                });
+                diveSiteMarkersLayer.addLayer(marker);
+            });
+
+            updateSelectedMarkerHighlight();
+        }
+
+        /**
+         * Initializes the interactive OpenStreetMap view for the configured bounding box.
+         */
+        function initDiveMap() {
+            const mapContainer = document.getElementById('dive-sites-map');
+            if (!mapContainer || typeof L === 'undefined' || diveMap) {
+                return;
+            }
+
+            diveMap = L.map('dive-sites-map');
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(diveMap);
+
+            diveMap.setView([51.56085, 3.97018], 10);
+            diveSiteMarkersLayer = L.layerGroup().addTo(diveMap);
+
+            if (availableDiveSites.length > 0) {
+                renderDiveSites();
+            }
+        }
 
         /**
          * Renders dive site options based on the checkbox filter state.
@@ -113,8 +237,10 @@ The dates and times are set to default values of the current date and time, and 
 
             const showOnlyDiveLocations = onlyDiveLocationsCheckbox.checked;
             const filteredLocations = showOnlyDiveLocations
-                ? availableDiveSites.filter(location => location.name.toLowerCase().includes('duiklocatie'))
+                ? availableDiveSites.filter(location => location.isDiveLocation)
                 : availableDiveSites;
+
+            renderMapMarkers(filteredLocations);
 
             diveSiteSelect.innerHTML = '';
 
@@ -133,6 +259,7 @@ The dates and times are set to default values of the current date and time, and 
 
             diveSiteSelect.disabled = false;
             diveSiteSelect.selectedIndex = 0;
+            updateSelectedMarkerHighlight();
         }
 
         /**
@@ -162,12 +289,32 @@ The dates and times are set to default values of the current date and time, and 
                 const locations = features
                     .map(feature => {
                         const properties = feature?.properties || {};
+                        const coordinates = Array.isArray(feature?.geometry?.coordinates)
+                            ? feature.geometry.coordinates
+                            : [];
+
+                        const originalName = String(properties.locationName || properties.locationname || '').trim();
+                        const isDiveLocation = /\([^)]*duiklocatie[^)]*\)/i.test(originalName);
+                        const cleanedName = originalName
+                            .replace(/\s*\([^)]*\)\s*/g, ' ')
+                            .replace(/\s{2,}/g, ' ')
+                            .trim();
+
                         return {
                             id: properties.id,
-                            name: properties.locationName || properties.locationname
+                            name: cleanedName,
+                            fullName: originalName,
+                            isDiveLocation: isDiveLocation,
+                            longitude: Number(coordinates[0]),
+                            latitude: Number(coordinates[1])
                         };
                     })
-                    .filter(location => location.id && location.name)
+                    .filter(location =>
+                        location.id &&
+                        location.name &&
+                        Number.isFinite(location.longitude) &&
+                        Number.isFinite(location.latitude)
+                    )
                     .sort((a, b) => a.name.localeCompare(b.name, 'nl-NL'));
 
                 if (locations.length === 0) {
@@ -230,7 +377,8 @@ The dates and times are set to default values of the current date and time, and 
             const endTime = document.getElementById('endTime').value;
             const diveSiteSelect = document.getElementById('diveSite');
             const diveSite = diveSiteSelect.value;
-            const diveSiteName = diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
+            const selectedLocation = availableDiveSites.find(location => location.id === diveSite);
+            const diveSiteName = selectedLocation?.fullName || diveSiteSelect.options[diveSiteSelect.selectedIndex]?.text || diveSite;
 
             const startDateTime = new Date(`${startDate}T${startTime}:00`);
             const endDateTime = new Date(`${endDate}T${endTime}:00`);
@@ -1004,6 +1152,7 @@ The dates and times are set to default values of the current date and time, and 
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
+                    updateSelectedMarkerHighlight();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
                 });
@@ -1030,6 +1179,7 @@ The dates and times are set to default values of the current date and time, and 
             }
 
             loadDiveSites();
+            initDiveMap();
         };
     </script>
     <style>
@@ -1053,6 +1203,39 @@ The dates and times are set to default values of the current date and time, and 
 			margin-bottom: 30px;
 			max-width: 600px;
 		}
+        .form-map-layout {
+            display: flex;
+            gap: 20px;
+            align-items: stretch;
+            margin-bottom: 20px;
+        }
+        .form-map-layout form {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .map-panel {
+            flex: 1;
+            background-color: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .map-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        #dive-sites-map {
+            width: 100%;
+            height: 360px;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+        }
+        .map-panel a {
+            margin-top: 8px;
+            font-size: 0.85em;
+        }
 		.form-row {
 			display: flex;
 			gap: 20px;
@@ -1124,6 +1307,18 @@ The dates and times are set to default values of the current date and time, and 
 		}
 		/* Responsive design for smaller screens */
 		@media (max-width: 768px) {
+            .form-map-layout {
+                flex-direction: column;
+            }
+
+            .form-map-layout form {
+                max-width: 100%;
+            }
+
+            #dive-sites-map {
+                height: 280px;
+            }
+
 			.form-row {
 				flex-direction: column;
 				gap: 15px;
@@ -1690,45 +1885,51 @@ The dates and times are set to default values of the current date and time, and 
 </head>
 <body>
     <h1>Duikstek stromingsvoorspelling</h1>
-    <form onsubmit="event.preventDefault(); fetchData();">
-        <div class="form-row">
-            <div class="form-group">
-                <div class="dive-site-label">
-                    <label for="diveSite">
-                    <span>Duikplaats:</span>
-                    </label>
-                    <label for="onlyDiveLocations" class="checkbox-inline">
-                        <input type="checkbox" id="onlyDiveLocations" checked>
-                        <span>Toon alleen duiklocaties</span>
-                    </label>
+    <div class="form-map-layout">
+        <form onsubmit="event.preventDefault(); fetchData();">
+            <div class="form-row">
+                <div class="form-group">
+                    <div class="dive-site-label">
+                        <label for="diveSite">
+                        <span>Duikplaats:</span>
+                        </label>
+                        <label for="onlyDiveLocations" class="checkbox-inline">
+                            <input type="checkbox" id="onlyDiveLocations" checked>
+                            <span>Toon alleen duiklocaties</span>
+                        </label>
+                    </div>
+                    <select id="diveSite" required>
+                        <option value="" selected disabled>Duikplaatsen laden...</option>
+                    </select>
                 </div>
-                <select id="diveSite" required>
-                    <option value="" selected disabled>Duikplaatsen laden...</option>
-                </select>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="startDate">Startdatum:</label>
+                    <input type="date" id="startDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="startTime">Starttijd:</label>
+                    <input type="time" id="startTime" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="endDate">Einddatum:</label>
+                    <input type="date" id="endDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="endTime">Eindtijd:</label>
+                    <input type="time" id="endTime" required>
+                </div>
+            </div>
+            <button type="submit">Toon stroming</button>
+        </form>
+        <div class="map-panel">
+            <h2>Kaart duikgebied</h2>
+            <div id="dive-sites-map" aria-label="OpenStreetMap duikgebied"></div>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="startDate">Startdatum:</label>
-                <input type="date" id="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="startTime">Starttijd:</label>
-                <input type="time" id="startTime" required>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="endDate">Einddatum:</label>
-                <input type="date" id="endDate" required>
-            </div>
-            <div class="form-group">
-                <label for="endTime">Eindtijd:</label>
-                <input type="time" id="endTime" required>
-            </div>
-        </div>
-        <button type="submit">Toon stroming</button>
-    </form>
+    </div>
     
     <div id="loading-spinner" class="loading-spinner">
         <div class="spinner"></div>
