@@ -31,9 +31,7 @@ De kaartachtergrond komt van OpenStreetMap.
 ## Uitleg van het scherm
 
 ### 1) Gebruikersinvoer
-
-**Plaats hier schermafbeelding gebruikersinvoer**  
-`[SCHERMAFBEELDING-INVOER-HIER]`
+<img width="1299" height="491" alt="Screenshot 2026-03-03 132451" src="https://github.com/user-attachments/assets/03539ccd-e015-4c29-8495-331704a95505" />
 
 De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke periode** je stromingsinformatie wilt ophalen.
 
@@ -57,15 +55,13 @@ De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke 
 	- Gebruik: klik nadat locatie en periode zijn ingevuld.
 
 ### 2) Duikvensters
-
-**Plaats hier schermafbeelding duikvensters**  
-`[SCHERMAFBEELDING-DUIKVENSTERS-HIER]`
+<img width="869" height="500" alt="Screenshot 2026-03-03 132503" src="https://github.com/user-attachments/assets/77056136-0eae-4d5d-b394-7fa2f11f1f0b" />
 
 In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten binnen de gekozen periode.
 
 - **Tijdlijnen per dag/per venster**
 	- Betekenis: laten zien hoe de stroming in de tijd verandert.
-	- Lezen: volg van links naar rechts; zo zie je hoe omstandigheden opbouwen en afnemen.
+	- Lezen: Iedere balk toont een venster van piekstroming tot piekstroming, met kleur- en tijdsmarkeringen voor verschillende stroomsnelheden tussen die pieken
 - **Kleuren in de balken**
 	- Betekenis: geven de sterkte van de stroming aan (zie legenda).
 	- Lezen: gunstiger stukken zijn rustiger kleuren; ongunstiger stukken zijn waarschuwingskleuren.
@@ -77,9 +73,7 @@ In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten bin
 	- Lezen: gebruik de legenda altijd als referentie bij interpretatie.
 
 ### 3) Stromingsdetails
-
-**Plaats hier schermafbeelding stromingsdetails**  
-`[SCHERMAFBEELDING-STROMINGSDETAILS-HIER]`
+<img width="1288" height="841" alt="Screenshot 2026-03-03 140321" src="https://github.com/user-attachments/assets/f8163199-5f45-4c80-94fd-c2cc6fbe853b" />
 
 Dit onderdeel geeft de gedetailleerde metingen in tabelvorm.
 
