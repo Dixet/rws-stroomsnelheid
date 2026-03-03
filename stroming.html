@@ -139,6 +139,20 @@ The dates and times are set to default values of the current date and time, and 
                     fillOpacity: isDiveLocation ? 0.95 : 0.85
                 });
                 marker.bindPopup(location.name);
+                marker.on('click', () => {
+                    const diveSiteSelect = document.getElementById('diveSite');
+                    if (!diveSiteSelect) {
+                        return;
+                    }
+
+                    const optionExists = Array.from(diveSiteSelect.options).some(option => option.value === location.id);
+                    if (!optionExists) {
+                        return;
+                    }
+
+                    diveSiteSelect.value = location.id;
+                    diveSiteSelect.dispatchEvent(new Event('change'));
+                });
                 diveSiteMarkersLayer.addLayer(marker);
             });
         }
