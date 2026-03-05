@@ -528,7 +528,6 @@ The dates and times are set to default values of the current date and time, and 
                 const SLACK_WINDOW_HALF_MINUTES = 120;
                 const FLOAT_TOLERANCE = 1e-9;
                 const EXTREMA_DEBOUNCE_THRESHOLD = 0.01; // m/s (1 cm/s)
-                const DEBUG_SLACK_DETECTION = true;
 
                 const calculateWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
                     const centerTime = new Date(measurement.timeStamp).getTime();
@@ -628,15 +627,6 @@ The dates and times are set to default values of the current date and time, and 
 
                 const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
-                if (DEBUG_SLACK_DETECTION) {
-                    console.groupCollapsed(`[Slack Debug] ${diveSiteName}`);
-                    console.log('Settings', {
-                        peakWindowHours: (PEAK_WINDOW_HALF_MINUTES * 2) / 60,
-                        slackWindowHours: (SLACK_WINDOW_HALF_MINUTES * 2) / 60,
-                        extremaDebounceThresholdMs: EXTREMA_DEBOUNCE_THRESHOLD
-                    });
-                }
-
                 // Peak current: current frame equals the maximum speed in its 5-hour window
                 currentMeasurements.forEach((measurement, index) => {
                     const windowInfo = peakWindowExtrema[index];
@@ -674,28 +664,6 @@ The dates and times are set to default values of the current date and time, and 
                         // the window separation is 0 (flat minima around the turning point).
                         const nextAcceptedAsSlack = nextIsWindowMinimum;
 
-                        if (DEBUG_SLACK_DETECTION) {
-                            console.log('Direction change (tie)', {
-                                index,
-                                current: {
-                                    timeStamp: measurement.timeStamp,
-                                    speedCms: Math.round(measurement.speed * 100),
-                                    direction: measurement.direction,
-                                    windowMinCms: Math.round(currentWindowInfo.minSpeed * 100),
-                                    windowSeparationCms: Math.round(currentWindowInfo.slackSeparation * 100)
-                                },
-                                next: {
-                                    timeStamp: nextMeasurement.timeStamp,
-                                    speedCms: Math.round(nextMeasurement.speed * 100),
-                                    direction: nextMeasurement.direction,
-                                    windowMinCms: Math.round(nextWindowInfo.minSpeed * 100),
-                                    windowSeparationCms: Math.round(nextWindowInfo.slackSeparation * 100),
-                                    selectedByTieRule: true,
-                                    selectedAsSlack: nextAcceptedAsSlack
-                                }
-                            });
-                        }
-
                         if (nextAcceptedAsSlack) {
                             nextMeasurement.isLowest = true;
                             slackTimes.add(index + 1);
@@ -719,28 +687,6 @@ The dates and times are set to default values of the current date and time, and 
                     if (nextIsWindowMinimum) {
                         nextMeasurement.isLowest = true;
                         slackTimes.add(index + 1);
-                    }
-
-                    if (DEBUG_SLACK_DETECTION) {
-                        console.log('Direction change', {
-                            index,
-                            current: {
-                                timeStamp: measurement.timeStamp,
-                                speedCms: Math.round(measurement.speed * 100),
-                                direction: measurement.direction,
-                                windowMinCms: Math.round(currentWindowInfo.minSpeed * 100),
-                                windowSeparationCms: Math.round(currentWindowInfo.slackSeparation * 100),
-                                selectedAsSlack: currentIsWindowMinimum
-                            },
-                            next: {
-                                timeStamp: nextMeasurement.timeStamp,
-                                speedCms: Math.round(nextMeasurement.speed * 100),
-                                direction: nextMeasurement.direction,
-                                windowMinCms: Math.round(nextWindowInfo.minSpeed * 100),
-                                windowSeparationCms: Math.round(nextWindowInfo.slackSeparation * 100),
-                                selectedAsSlack: nextIsWindowMinimum
-                            }
-                        });
                     }
                 });
 
@@ -790,18 +736,6 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Convert slackTimes set to sorted array for downstream window creation
                 const slackIndices = Array.from(prunedSlackTimes).sort((a, b) => a - b);
-
-                if (DEBUG_SLACK_DETECTION) {
-                    console.log('Slack indices before pruning', Array.from(slackTimes).sort((a, b) => a - b));
-                    console.log('Slack indices after pruning', slackIndices);
-                    console.log('Slack timestamps after pruning', slackIndices.map(index => ({
-                        index,
-                        timeStamp: currentMeasurements[index].timeStamp,
-                        speedCms: Math.round(currentMeasurements[index].speed * 100),
-                        direction: currentMeasurements[index].direction
-                    })));
-                    console.groupEnd();
-                }
 
                 /**
                  * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
@@ -946,9 +880,6 @@ The dates and times are set to default values of the current date and time, and 
                     // Determine base width based on screen size for better responsiveness
                     const screenWidth = getViewportWidth();
                     let baseWidth;
-                    console.log('Screen width:', screenWidth); // Debug log
-                    console.log('window.innerWidth:', window.innerWidth); // Debug log
-                    console.log('document.documentElement.clientWidth:', document.documentElement.clientWidth); // Debug log
                     
                     if (screenWidth >= 1400) {
                         baseWidth = 1200; // Large screens - use more space
@@ -959,7 +890,6 @@ The dates and times are set to default values of the current date and time, and 
                     } else {
                         baseWidth = 500; // Small screens - compact size
                     }
-                    console.log('Base width:', baseWidth); // Debug log
                     
                     // Calculate consistent pixels-per-minute ratio for all timeline bars
                     // This ensures segments with the same duration have the same pixel width across all bars
@@ -979,8 +909,7 @@ The dates and times are set to default values of the current date and time, and 
                             const adjustedPixelsPerMinute = barWidth / totalDuration;
                         }
                     }
-                    
-                    console.log('Calculated bar width:', barWidth); // Debug log
+
                     timelineBar.style.width = `${barWidth}px`;
                     
                     // Add filler segment first if needed to align slack times
