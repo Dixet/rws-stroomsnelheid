@@ -473,7 +473,6 @@ The dates and times are set to default values of the current date and time, and 
                     .map((speedEvent, index) => ({
                         timeStamp: speedEvent.timeStamp,
                         speed: parseFloat(speedEvent.value), // Current speed in m/s
-                        speedCms: Math.round(parseFloat(speedEvent.value) * 100), // Rounded speed in cm/s (matches UI)
                         direction: parseFloat(directionEvents[index].value), // Current direction in degrees
                         isLowest: false, // Will be set during slack time calculation
                         isPeak: false // Will be set during peak current calculation
@@ -528,7 +527,7 @@ The dates and times are set to default values of the current date and time, and 
                 const PEAK_WINDOW_HALF_MINUTES = 150;
                 const SLACK_WINDOW_HALF_MINUTES = 120;
                 const FLOAT_TOLERANCE = 1e-9;
-                const EXTREMA_DEBOUNCE_THRESHOLD_CMS = 1; // cm/s
+                const EXTREMA_DEBOUNCE_THRESHOLD = 0.01; // m/s (1 cm/s)
 
                 const calculateWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
                     const centerTime = new Date(measurement.timeStamp).getTime();
@@ -541,9 +540,9 @@ The dates and times are set to default values of the current date and time, and 
                         const deltaMinutes = Math.abs(candidateTime - centerTime) / (1000 * 60);
 
                         if (deltaMinutes <= windowHalfMinutes) {
-                            windowSpeeds.push(candidate.speedCms);
-                            minSpeed = Math.min(minSpeed, candidate.speedCms);
-                            maxSpeed = Math.max(maxSpeed, candidate.speedCms);
+                            windowSpeeds.push(candidate.speed);
+                            minSpeed = Math.min(minSpeed, candidate.speed);
+                            maxSpeed = Math.max(maxSpeed, candidate.speed);
                         }
                     });
 
@@ -575,18 +574,20 @@ The dates and times are set to default values of the current date and time, and 
                 const slackWindowExtrema = calculateWindowExtrema(SLACK_WINDOW_HALF_MINUTES);
 
                 const passesExtremaDebounce = (separation) =>
-                    separation + FLOAT_TOLERANCE >= EXTREMA_DEBOUNCE_THRESHOLD_CMS;
+                    separation + FLOAT_TOLERANCE >= EXTREMA_DEBOUNCE_THRESHOLD;
+
+                const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
                 // Peak current: current frame equals the maximum speed in its 5-hour window
                 currentMeasurements.forEach((measurement, index) => {
                     const windowInfo = peakWindowExtrema[index];
                     measurement.isPeak =
-                        measurement.speedCms === windowInfo.maxSpeed &&
+                        approximatelyEqual(measurement.speed, windowInfo.maxSpeed) &&
                         passesExtremaDebounce(windowInfo.peakSeparation);
                 });
 
                 // Slack current: direction change (existing logic) AND current frame equals
-                // the minimum speed in its own 1-hour window.
+                // the minimum speed in its own 4-hour window.
                 const slackTimes = new Set();
                 currentMeasurements.forEach((measurement, index) => {
                     if (index >= currentMeasurements.length - 1) {
@@ -598,25 +599,38 @@ The dates and times are set to default values of the current date and time, and 
                         return;
                     }
 
-                    // Determine one slack candidate per direction-change pair.
-                    // Prefer the lower-speed frame; if equal, prefer the later frame
-                    // because that represents the first point after the direction switch.
-                    let slackCandidateIndex = index;
-                    if (nextMeasurement.speedCms < measurement.speedCms) {
-                        slackCandidateIndex = index + 1;
-                    } else if (nextMeasurement.speedCms === measurement.speedCms) {
-                        slackCandidateIndex = index + 1;
+                    // Prefer the later point when both sides of the direction change
+                    // have the same speed (tie).
+                    const isTie = approximatelyEqual(measurement.speed, nextMeasurement.speed);
+                    if (isTie) {
+                        const nextIsWindowMinimum = approximatelyEqual(
+                            nextMeasurement.speed,
+                            slackWindowExtrema[index + 1].minSpeed
+                        ) && passesExtremaDebounce(slackWindowExtrema[index + 1].slackSeparation);
+
+                        if (nextIsWindowMinimum) {
+                            nextMeasurement.isLowest = true;
+                            slackTimes.add(index + 1);
+                        }
+                        return;
                     }
 
-                    const slackCandidate = currentMeasurements[slackCandidateIndex];
-                    const slackCandidateWindow = slackWindowExtrema[slackCandidateIndex];
-                    const candidateIsWindowMinimum =
-                        slackCandidate.speedCms === slackCandidateWindow.minSpeed &&
-                        passesExtremaDebounce(slackCandidateWindow.slackSeparation);
+                    const currentIsWindowMinimum = approximatelyEqual(
+                        measurement.speed,
+                        slackWindowExtrema[index].minSpeed
+                    ) && passesExtremaDebounce(slackWindowExtrema[index].slackSeparation);
+                    if (currentIsWindowMinimum) {
+                        measurement.isLowest = true;
+                        slackTimes.add(index);
+                    }
 
-                    if (candidateIsWindowMinimum) {
-                        slackCandidate.isLowest = true;
-                        slackTimes.add(slackCandidateIndex);
+                    const nextIsWindowMinimum = approximatelyEqual(
+                        nextMeasurement.speed,
+                        slackWindowExtrema[index + 1].minSpeed
+                    ) && passesExtremaDebounce(slackWindowExtrema[index + 1].slackSeparation);
+                    if (nextIsWindowMinimum) {
+                        nextMeasurement.isLowest = true;
+                        slackTimes.add(index + 1);
                     }
                 });
 
