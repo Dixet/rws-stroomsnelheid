@@ -17,7 +17,7 @@ Deze pagina is bedoeld voor duikers die in Zeeland duiken en vooraf een praktisc
 
 ## Herkomst van de gegevens
 
-De gegevens op deze pagina komen van **Rijkswaterstaat Waterberichtgeving** (RWS API).
+De gegevens op deze pagina komen van **[Rijkswaterstaat Waterberichtgeving](https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland)** (RWS API).
 De kaartachtergrond komt van OpenStreetMap.
 
 ## Gebruik in het kort
