@@ -473,6 +473,7 @@ The dates and times are set to default values of the current date and time, and 
                     .map((speedEvent, index) => ({
                         timeStamp: speedEvent.timeStamp,
                         speed: parseFloat(speedEvent.value), // Current speed in m/s
+                        speedCms: Math.round(parseFloat(speedEvent.value) * 100), // Rounded speed in cm/s (matches UI)
                         direction: parseFloat(directionEvents[index].value), // Current direction in degrees
                         isLowest: false, // Will be set during slack time calculation
                         isPeak: false // Will be set during peak current calculation
@@ -522,95 +523,105 @@ The dates and times are set to default values of the current date and time, and 
                  */
                 const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
 
-                // Pre-calculate all slack times once to avoid redundant calculations
-                // Slack times occur at direction changes with the lowest water speed
+                // Pre-calculate moving window extrema and derive slack/peak markers.
+                // Peak uses 5-hour window (±2.5h), slack uses 4-hour window (±2h).
+                const PEAK_WINDOW_HALF_MINUTES = 150;
+                const SLACK_WINDOW_HALF_MINUTES = 120;
+                const FLOAT_TOLERANCE = 1e-9;
+                const EXTREMA_DEBOUNCE_THRESHOLD_CMS = 1; // cm/s
+
+                const calculateWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
+                    const centerTime = new Date(measurement.timeStamp).getTime();
+                    let minSpeed = Number.POSITIVE_INFINITY;
+                    let maxSpeed = Number.NEGATIVE_INFINITY;
+                    const windowSpeeds = [];
+
+                    currentMeasurements.forEach((candidate) => {
+                        const candidateTime = new Date(candidate.timeStamp).getTime();
+                        const deltaMinutes = Math.abs(candidateTime - centerTime) / (1000 * 60);
+
+                        if (deltaMinutes <= windowHalfMinutes) {
+                            windowSpeeds.push(candidate.speedCms);
+                            minSpeed = Math.min(minSpeed, candidate.speedCms);
+                            maxSpeed = Math.max(maxSpeed, candidate.speedCms);
+                        }
+                    });
+
+                    const secondHighestSpeed = windowSpeeds
+                        .filter(speed => speed < maxSpeed - FLOAT_TOLERANCE)
+                        .reduce((highest, speed) => Math.max(highest, speed), Number.NEGATIVE_INFINITY);
+
+                    const secondLowestSpeed = windowSpeeds
+                        .filter(speed => speed > minSpeed + FLOAT_TOLERANCE)
+                        .reduce((lowest, speed) => Math.min(lowest, speed), Number.POSITIVE_INFINITY);
+
+                    const peakSeparation = secondHighestSpeed === Number.NEGATIVE_INFINITY
+                        ? 0
+                        : maxSpeed - secondHighestSpeed;
+
+                    const slackSeparation = secondLowestSpeed === Number.POSITIVE_INFINITY
+                        ? 0
+                        : secondLowestSpeed - minSpeed;
+
+                    return {
+                        minSpeed,
+                        maxSpeed,
+                        peakSeparation,
+                        slackSeparation
+                    };
+                });
+
+                const peakWindowExtrema = calculateWindowExtrema(PEAK_WINDOW_HALF_MINUTES);
+                const slackWindowExtrema = calculateWindowExtrema(SLACK_WINDOW_HALF_MINUTES);
+
+                const passesExtremaDebounce = (separation) =>
+                    separation + FLOAT_TOLERANCE >= EXTREMA_DEBOUNCE_THRESHOLD_CMS;
+
+                // Peak current: current frame equals the maximum speed in its 5-hour window
+                currentMeasurements.forEach((measurement, index) => {
+                    const windowInfo = peakWindowExtrema[index];
+                    measurement.isPeak =
+                        measurement.speedCms === windowInfo.maxSpeed &&
+                        passesExtremaDebounce(windowInfo.peakSeparation);
+                });
+
+                // Slack current: direction change (existing logic) AND current frame equals
+                // the minimum speed in its own 1-hour window.
                 const slackTimes = new Set();
                 currentMeasurements.forEach((measurement, index) => {
-                    if (index < currentMeasurements.length - 1) {
-                        const currentDir = measurement.direction;
-                        const nextDir = currentMeasurements[index + 1].direction;
-                        
-                        // Check if this is a tide turning point (direction change)
-                        if (isDirectionChange(currentDir, nextDir)) {
-                            const currentSpeed = measurement.speed;
-                            const nextSpeed = currentMeasurements[index + 1].speed;
-                            
-                            // Mark the measurement with lower speed as the slack time
-                            // This represents the moment of minimal current flow
-                            if (currentSpeed < nextSpeed) {
-                                currentMeasurements[index].isLowest = true;
-                                slackTimes.add(index);
-                            } else {
-                                currentMeasurements[index + 1].isLowest = true;
-                                slackTimes.add(index + 1);
-                            }
-                        }
+                    if (index >= currentMeasurements.length - 1) {
+                        return;
+                    }
+
+                    const nextMeasurement = currentMeasurements[index + 1];
+                    if (!isDirectionChange(measurement.direction, nextMeasurement.direction)) {
+                        return;
+                    }
+
+                    // Determine one slack candidate per direction-change pair.
+                    // Prefer the lower-speed frame; if equal, prefer the later frame
+                    // because that represents the first point after the direction switch.
+                    let slackCandidateIndex = index;
+                    if (nextMeasurement.speedCms < measurement.speedCms) {
+                        slackCandidateIndex = index + 1;
+                    } else if (nextMeasurement.speedCms === measurement.speedCms) {
+                        slackCandidateIndex = index + 1;
+                    }
+
+                    const slackCandidate = currentMeasurements[slackCandidateIndex];
+                    const slackCandidateWindow = slackWindowExtrema[slackCandidateIndex];
+                    const candidateIsWindowMinimum =
+                        slackCandidate.speedCms === slackCandidateWindow.minSpeed &&
+                        passesExtremaDebounce(slackCandidateWindow.slackSeparation);
+
+                    if (candidateIsWindowMinimum) {
+                        slackCandidate.isLowest = true;
+                        slackTimes.add(slackCandidateIndex);
                     }
                 });
 
-                // Calculate peak currents - highest speed between slack tides
-                // Convert slackTimes set to sorted array for easier processing
+                // Convert slackTimes set to sorted array for downstream window creation
                 const slackIndices = Array.from(slackTimes).sort((a, b) => a - b);
-                
-                // Find peak currents between consecutive slack times
-                for (let i = 0; i < slackIndices.length - 1; i++) {
-                    const startIndex = slackIndices[i];
-                    const endIndex = slackIndices[i + 1];
-                    
-                    // Find the measurement with highest speed between these slack times
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    
-                    for (let j = startIndex + 1; j < endIndex; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
-                        }
-                    }
-                    
-                    // Mark the peak current if found
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
-                
-                // Handle peak current before first slack time (if any measurements exist before first slack)
-                if (slackIndices.length > 0 && slackIndices[0] > 0) {
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    
-                    for (let j = 0; j < slackIndices[0]; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
-                        }
-                    }
-                    
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
-                
-                // Handle peak current after last slack time (if any measurements exist after last slack)
-                if (slackIndices.length > 0 && slackIndices[slackIndices.length - 1] < currentMeasurements.length - 1) {
-                    let peakIndex = -1;
-                    let highestSpeed = -1;
-                    const lastSlackIndex = slackIndices[slackIndices.length - 1];
-                    
-                    for (let j = lastSlackIndex + 1; j < currentMeasurements.length; j++) {
-                        const currentSpeed = currentMeasurements[j].speed;
-                        if (currentSpeed > highestSpeed) {
-                            highestSpeed = currentSpeed;
-                            peakIndex = j;
-                        }
-                    }
-                    
-                    if (peakIndex !== -1) {
-                        currentMeasurements[peakIndex].isPeak = true;
-                    }
-                }
 
                 /**
                  * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
@@ -1077,7 +1088,7 @@ The dates and times are set to default values of the current date and time, and 
                 // Populate table with all current measurement data
                 // Note: slack times were already calculated earlier, so we just use the isLowest flag
                 currentMeasurements.forEach((measurement, index) => {
-                    if (!measurement.speed) return; // Skip entries without valid current data
+                    if (measurement.speed === null || measurement.speed === undefined || Number.isNaN(measurement.speed)) return; // Skip only invalid current data
                     
                     const row = document.createElement('tr');
                     const dateCell = document.createElement('td');
