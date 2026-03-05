@@ -634,8 +634,52 @@ The dates and times are set to default values of the current date and time, and 
                     }
                 });
 
+                const peakIndices = currentMeasurements
+                    .map((measurement, index) => (measurement.isPeak ? index : -1))
+                    .filter(index => index !== -1);
+
+                // If multiple slack markers exist between two peaks, keep only the one
+                // closest to the midpoint between those peaks.
+                const prunedSlackTimes = new Set(slackTimes);
+                if (peakIndices.length >= 2) {
+                    for (let peakIndex = 0; peakIndex < peakIndices.length - 1; peakIndex++) {
+                        const startPeakIndex = peakIndices[peakIndex];
+                        const endPeakIndex = peakIndices[peakIndex + 1];
+
+                        const candidateSlackIndices = Array.from(prunedSlackTimes)
+                            .filter(slackIndex => slackIndex > startPeakIndex && slackIndex < endPeakIndex)
+                            .sort((a, b) => a - b);
+
+                        if (candidateSlackIndices.length <= 1) {
+                            continue;
+                        }
+
+                        const startPeakMs = new Date(currentMeasurements[startPeakIndex].timeStamp).getTime();
+                        const endPeakMs = new Date(currentMeasurements[endPeakIndex].timeStamp).getTime();
+                        const midpointMs = (startPeakMs + endPeakMs) / 2;
+
+                        let bestSlackIndex = candidateSlackIndices[0];
+                        let smallestDistance = Math.abs(new Date(currentMeasurements[bestSlackIndex].timeStamp).getTime() - midpointMs);
+
+                        candidateSlackIndices.forEach((candidateIndex) => {
+                            const candidateDistance = Math.abs(new Date(currentMeasurements[candidateIndex].timeStamp).getTime() - midpointMs);
+                            if (candidateDistance < smallestDistance) {
+                                bestSlackIndex = candidateIndex;
+                                smallestDistance = candidateDistance;
+                            }
+                        });
+
+                        candidateSlackIndices.forEach((candidateIndex) => {
+                            if (candidateIndex !== bestSlackIndex) {
+                                prunedSlackTimes.delete(candidateIndex);
+                                currentMeasurements[candidateIndex].isLowest = false;
+                            }
+                        });
+                    }
+                }
+
                 // Convert slackTimes set to sorted array for downstream window creation
-                const slackIndices = Array.from(slackTimes).sort((a, b) => a - b);
+                const slackIndices = Array.from(prunedSlackTimes).sort((a, b) => a - b);
 
                 /**
                  * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
