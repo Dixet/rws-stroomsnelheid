@@ -528,6 +528,7 @@ The dates and times are set to default values of the current date and time, and 
                 const SLACK_WINDOW_HALF_MINUTES = 120;
                 const FLOAT_TOLERANCE = 1e-9;
                 const EXTREMA_DEBOUNCE_THRESHOLD = 0.01; // m/s (1 cm/s)
+                const DEBUG_SLACK_DETECTION = true;
 
                 const calculateWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
                     const centerTime = new Date(measurement.timeStamp).getTime();
@@ -571,12 +572,70 @@ The dates and times are set to default values of the current date and time, and 
                 });
 
                 const peakWindowExtrema = calculateWindowExtrema(PEAK_WINDOW_HALF_MINUTES);
-                const slackWindowExtrema = calculateWindowExtrema(SLACK_WINDOW_HALF_MINUTES);
+
+                // For slack detection, only include points that are part of a direction-change event
+                // so unrelated low speeds without a direction change cannot suppress a true slack.
+                const directionChangePointFlags = currentMeasurements.map(() => false);
+                currentMeasurements.forEach((measurement, index) => {
+                    if (index >= currentMeasurements.length - 1) {
+                        return;
+                    }
+
+                    const nextMeasurement = currentMeasurements[index + 1];
+                    if (isDirectionChange(measurement.direction, nextMeasurement.direction)) {
+                        directionChangePointFlags[index] = true;
+                        directionChangePointFlags[index + 1] = true;
+                    }
+                });
+
+                const calculateSlackWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
+                    const centerTime = new Date(measurement.timeStamp).getTime();
+                    let minSpeed = Number.POSITIVE_INFINITY;
+                    const candidateSpeeds = [];
+
+                    currentMeasurements.forEach((candidate, candidateIndex) => {
+                        if (!directionChangePointFlags[candidateIndex]) {
+                            return;
+                        }
+
+                        const candidateTime = new Date(candidate.timeStamp).getTime();
+                        const deltaMinutes = Math.abs(candidateTime - centerTime) / (1000 * 60);
+
+                        if (deltaMinutes <= windowHalfMinutes) {
+                            candidateSpeeds.push(candidate.speed);
+                            minSpeed = Math.min(minSpeed, candidate.speed);
+                        }
+                    });
+
+                    const secondLowestSpeed = candidateSpeeds
+                        .filter(speed => speed > minSpeed + FLOAT_TOLERANCE)
+                        .reduce((lowest, speed) => Math.min(lowest, speed), Number.POSITIVE_INFINITY);
+
+                    const slackSeparation = secondLowestSpeed === Number.POSITIVE_INFINITY
+                        ? 0
+                        : secondLowestSpeed - minSpeed;
+
+                    return {
+                        minSpeed,
+                        slackSeparation
+                    };
+                });
+
+                const slackWindowExtrema = calculateSlackWindowExtrema(SLACK_WINDOW_HALF_MINUTES);
 
                 const passesExtremaDebounce = (separation) =>
                     separation + FLOAT_TOLERANCE >= EXTREMA_DEBOUNCE_THRESHOLD;
 
                 const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
+
+                if (DEBUG_SLACK_DETECTION) {
+                    console.groupCollapsed(`[Slack Debug] ${diveSiteName}`);
+                    console.log('Settings', {
+                        peakWindowHours: (PEAK_WINDOW_HALF_MINUTES * 2) / 60,
+                        slackWindowHours: (SLACK_WINDOW_HALF_MINUTES * 2) / 60,
+                        extremaDebounceThresholdMs: EXTREMA_DEBOUNCE_THRESHOLD
+                    });
+                }
 
                 // Peak current: current frame equals the maximum speed in its 5-hour window
                 currentMeasurements.forEach((measurement, index) => {
@@ -599,16 +658,45 @@ The dates and times are set to default values of the current date and time, and 
                         return;
                     }
 
+                    const currentWindowInfo = slackWindowExtrema[index];
+                    const nextWindowInfo = slackWindowExtrema[index + 1];
+
                     // Prefer the later point when both sides of the direction change
                     // have the same speed (tie).
                     const isTie = approximatelyEqual(measurement.speed, nextMeasurement.speed);
                     if (isTie) {
                         const nextIsWindowMinimum = approximatelyEqual(
                             nextMeasurement.speed,
-                            slackWindowExtrema[index + 1].minSpeed
-                        ) && passesExtremaDebounce(slackWindowExtrema[index + 1].slackSeparation);
+                            nextWindowInfo.minSpeed
+                        );
 
-                        if (nextIsWindowMinimum) {
+                        // For direction-change ties, allow the later point as slack even when
+                        // the window separation is 0 (flat minima around the turning point).
+                        const nextAcceptedAsSlack = nextIsWindowMinimum;
+
+                        if (DEBUG_SLACK_DETECTION) {
+                            console.log('Direction change (tie)', {
+                                index,
+                                current: {
+                                    timeStamp: measurement.timeStamp,
+                                    speedCms: Math.round(measurement.speed * 100),
+                                    direction: measurement.direction,
+                                    windowMinCms: Math.round(currentWindowInfo.minSpeed * 100),
+                                    windowSeparationCms: Math.round(currentWindowInfo.slackSeparation * 100)
+                                },
+                                next: {
+                                    timeStamp: nextMeasurement.timeStamp,
+                                    speedCms: Math.round(nextMeasurement.speed * 100),
+                                    direction: nextMeasurement.direction,
+                                    windowMinCms: Math.round(nextWindowInfo.minSpeed * 100),
+                                    windowSeparationCms: Math.round(nextWindowInfo.slackSeparation * 100),
+                                    selectedByTieRule: true,
+                                    selectedAsSlack: nextAcceptedAsSlack
+                                }
+                            });
+                        }
+
+                        if (nextAcceptedAsSlack) {
                             nextMeasurement.isLowest = true;
                             slackTimes.add(index + 1);
                         }
@@ -617,8 +705,8 @@ The dates and times are set to default values of the current date and time, and 
 
                     const currentIsWindowMinimum = approximatelyEqual(
                         measurement.speed,
-                        slackWindowExtrema[index].minSpeed
-                    ) && passesExtremaDebounce(slackWindowExtrema[index].slackSeparation);
+                        currentWindowInfo.minSpeed
+                    ) && passesExtremaDebounce(currentWindowInfo.slackSeparation);
                     if (currentIsWindowMinimum) {
                         measurement.isLowest = true;
                         slackTimes.add(index);
@@ -626,11 +714,33 @@ The dates and times are set to default values of the current date and time, and 
 
                     const nextIsWindowMinimum = approximatelyEqual(
                         nextMeasurement.speed,
-                        slackWindowExtrema[index + 1].minSpeed
-                    ) && passesExtremaDebounce(slackWindowExtrema[index + 1].slackSeparation);
+                        nextWindowInfo.minSpeed
+                    ) && passesExtremaDebounce(nextWindowInfo.slackSeparation);
                     if (nextIsWindowMinimum) {
                         nextMeasurement.isLowest = true;
                         slackTimes.add(index + 1);
+                    }
+
+                    if (DEBUG_SLACK_DETECTION) {
+                        console.log('Direction change', {
+                            index,
+                            current: {
+                                timeStamp: measurement.timeStamp,
+                                speedCms: Math.round(measurement.speed * 100),
+                                direction: measurement.direction,
+                                windowMinCms: Math.round(currentWindowInfo.minSpeed * 100),
+                                windowSeparationCms: Math.round(currentWindowInfo.slackSeparation * 100),
+                                selectedAsSlack: currentIsWindowMinimum
+                            },
+                            next: {
+                                timeStamp: nextMeasurement.timeStamp,
+                                speedCms: Math.round(nextMeasurement.speed * 100),
+                                direction: nextMeasurement.direction,
+                                windowMinCms: Math.round(nextWindowInfo.minSpeed * 100),
+                                windowSeparationCms: Math.round(nextWindowInfo.slackSeparation * 100),
+                                selectedAsSlack: nextIsWindowMinimum
+                            }
+                        });
                     }
                 });
 
@@ -680,6 +790,18 @@ The dates and times are set to default values of the current date and time, and 
 
                 // Convert slackTimes set to sorted array for downstream window creation
                 const slackIndices = Array.from(prunedSlackTimes).sort((a, b) => a - b);
+
+                if (DEBUG_SLACK_DETECTION) {
+                    console.log('Slack indices before pruning', Array.from(slackTimes).sort((a, b) => a - b));
+                    console.log('Slack indices after pruning', slackIndices);
+                    console.log('Slack timestamps after pruning', slackIndices.map(index => ({
+                        index,
+                        timeStamp: currentMeasurements[index].timeStamp,
+                        speedCms: Math.round(currentMeasurements[index].speed * 100),
+                        direction: currentMeasurements[index].direction
+                    })));
+                    console.groupEnd();
+                }
 
                 /**
                  * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
