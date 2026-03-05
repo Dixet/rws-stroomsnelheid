@@ -841,6 +841,21 @@ The dates and times are set to default values of the current date and time, and 
                     });
                 });
 
+                // If there is less than 2 hours of data after the last slack tide,
+                // do not render that final visual time window.
+                if (windows.length > 0) {
+                    const lastWindow = windows[windows.length - 1];
+                    const lastMeasurement = currentMeasurements[currentMeasurements.length - 1];
+                    const minutesAfterLastSlack = getMinutesBetween(lastWindow.slackTime, lastMeasurement);
+
+                    if (minutesAfterLastSlack < 120) {
+                        windows.pop();
+                    }
+                }
+
+                // Recalculate max duration from the windows that will actually be rendered.
+                maxDuration = windows.reduce((largest, window) => Math.max(largest, window.duration), 0);
+
                 // PHASE 2: Create visual timeline representation
                 // Find the window with the longest time between start and slack for alignment
                 let maxStartToSlackTime = 0;
