@@ -763,10 +763,11 @@ The dates and times are set to default values of the current date and time, and 
                 diveWindowsContainer.appendChild(diveWindowsHeader);
 
                 // Check if conditions are favorable throughout the entire period
-                const allSpeedsLow = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.3);
-                
-                if (allSpeedsLow) {
-                    // Create favorable conditions info panel
+                const allSpeedsBelowTwenty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.2);
+                const allSpeedsBelowThirty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.3);
+
+                if (allSpeedsBelowTwenty) {
+                    // Existing green panel for very low current during the full period (< 20 cm/s)
                     const favorableConditionsPanel = document.createElement('div');
                     favorableConditionsPanel.style.backgroundColor = '#d4edda';
                     favorableConditionsPanel.style.color = '#155724';
@@ -777,9 +778,24 @@ The dates and times are set to default values of the current date and time, and 
                     favorableConditionsPanel.style.fontSize = '1.1em';
                     favorableConditionsPanel.style.fontWeight = 'bold';
                     favorableConditionsPanel.style.textAlign = 'center';
-                    favorableConditionsPanel.innerHTML = '🌊 Gunstige omstandigheden, duiken kan gedurende de hele periode worden gedaan!<br><span style="font-size: 0.9em; font-weight: normal; color: #0f5132;">Alle stromingen zijn ≤ 30 cm/s</span>';
-                    
+                    favorableConditionsPanel.innerHTML = '🌊 Gunstige omstandigheden, duiken kan gedurende de hele periode worden gedaan!<br><span style="font-size: 0.9em; font-weight: normal; color: #0f5132;">Alle stromingen zijn < 20 cm/s</span>';
+
                     diveWindowsContainer.appendChild(favorableConditionsPanel);
+                } else if (allSpeedsBelowThirty) {
+                    // Orange panel for manageable current during the full period (< 30 cm/s)
+                    const experiencedDiversPanel = document.createElement('div');
+                    experiencedDiversPanel.style.backgroundColor = '#fff3cd';
+                    experiencedDiversPanel.style.color = '#7a4b00';
+                    experiencedDiversPanel.style.border = '1px solid #f0ad4e';
+                    experiencedDiversPanel.style.borderRadius = '8px';
+                    experiencedDiversPanel.style.padding = '15px';
+                    experiencedDiversPanel.style.margin = '15px 0 20px 0';
+                    experiencedDiversPanel.style.fontSize = '1.1em';
+                    experiencedDiversPanel.style.fontWeight = 'bold';
+                    experiencedDiversPanel.style.textAlign = 'center';
+                    experiencedDiversPanel.innerHTML = '🌊 Duiken kan gedurende de hele periode worden gedaan voor ervaren getijdenduikers.<br><span style="font-size: 0.9em; font-weight: normal; color: #9a6700;">Alle stromingen zijn < 30 cm/s</span>';
+
+                    diveWindowsContainer.appendChild(experiencedDiversPanel);
                 }
 
                 // Create timeline container for visual representation of dive windows
