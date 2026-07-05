@@ -376,7 +376,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             
             // Convert degrees to 8-point compass index using mathematical division
             // Each compass point covers 45 degrees (360/8 = 45)
-            const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+            const directions = ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"];
             return directions[Math.round(degrees / 45) % 8];
         }
 
