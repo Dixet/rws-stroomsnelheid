@@ -285,7 +285,22 @@ The dates and times are set to default values of the current date and time, and 
             });
 
             diveSiteSelect.disabled = false;
-            diveSiteSelect.selectedIndex = 0;
+            
+            // Restore selected dive site from local storage if available
+            const savedDiveSite = localStorage.getItem('selectedDiveSite');
+            if (savedDiveSite) {
+                const option = diveSiteSelect.querySelector(`option[value="${savedDiveSite}"]`);
+                if (option) {
+                    option.selected = true;
+                } else {
+                    // Fallback to first option if saved dive site is not available
+                    diveSiteSelect.selectedIndex = 0;
+                }
+            } else {
+                // No saved selection, use first option
+                diveSiteSelect.selectedIndex = 0;
+            }
+            
             updateSelectedMarkerHighlight();
         }
 
@@ -1338,6 +1353,8 @@ The dates and times are set to default values of the current date and time, and 
 
             if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
                 diveSiteSelect.addEventListener('change', () => {
+                    // Save selected dive site to local storage
+                    localStorage.setItem('selectedDiveSite', diveSiteSelect.value);
                     updateSelectedMarkerHighlight();
                     openSelectedMarkerPopup();
                     diveWindowsContainer.innerHTML = '';
@@ -1346,7 +1363,15 @@ The dates and times are set to default values of the current date and time, and 
             }
 
             if (onlyDiveLocationsCheckbox && diveWindowsContainer && resultsContainer) {
+                // Restore checkbox state from local storage if available
+                const savedState = localStorage.getItem('onlyDiveLocations');
+                if (savedState !== null) {
+                    onlyDiveLocationsCheckbox.checked = savedState === 'true';
+                }
+                
                 onlyDiveLocationsCheckbox.addEventListener('change', () => {
+                    // Save checkbox state to local storage
+                    localStorage.setItem('onlyDiveLocations', onlyDiveLocationsCheckbox.checked);
                     renderDiveSites();
                     diveWindowsContainer.innerHTML = '';
                     resultsContainer.innerHTML = '';
