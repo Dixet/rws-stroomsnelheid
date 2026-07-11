@@ -48,7 +48,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
          */
         function getMaxEndDate(startDate) {
             const start = new Date(`${startDate}T00:00:00`);
-            start.setDate(start.getDate() + 3);
+            start.setDate(start.getDate() + 2);
             const year = start.getFullYear();
             const month = String(start.getMonth() + 1).padStart(2, '0');
             const day = String(start.getDate()).padStart(2, '0');
@@ -71,13 +71,13 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             document.getElementById('startDate').value = currentDate;
             document.getElementById('startTime').value = currentTime;
 
-            // Set end to 48 hours after start (i.e., two days later at 00:00 local time)
-            const endDateObj = new Date(year, now.getMonth(), now.getDate() + 2, 0, 0, 0, 0);
+            // Set end to 48 hours after start (i.e., two days later at 23:59 local time)
+            const endDateObj = new Date(year, now.getMonth(), now.getDate() + 2, 23, 59, 0, 0);
             const endYear = endDateObj.getFullYear();
             const endMonth = String(endDateObj.getMonth() + 1).padStart(2, '0');
             const endDay = String(endDateObj.getDate()).padStart(2, '0');
             const endDate = `${endYear}-${endMonth}-${endDay}`;
-            const endTime = '00:00';
+            const endTime = '23:59';
             document.getElementById('endDate').value = endDate;
             document.getElementById('endTime').value = endTime;
 
