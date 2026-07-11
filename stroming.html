@@ -41,6 +41,21 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         }
 
         /**
+         * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
+         * The maximum end date is exactly three days after the start date.
+         * @param {string} startDate - Date string in YYYY-MM-DD format.
+         * @returns {string} - Maximum allowed end date string.
+         */
+        function getMaxEndDate(startDate) {
+            const start = new Date(`${startDate}T00:00:00`);
+            start.setDate(start.getDate() + 3);
+            const year = start.getFullYear();
+            const month = String(start.getMonth() + 1).padStart(2, '0');
+            const day = String(start.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        /**
          * Sets default date and time values for the form inputs when the page loads.
          * Start date/time is set to current date/time, end date/time is set to 48 hours later.
          * This provides a reasonable default time range for fetching dive site data.
@@ -92,17 +107,27 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 return;
             }
 
+            const maxEndDate = getMaxEndDate(startDate);
             endDateInput.min = startDate;
+            endDateInput.max = maxEndDate;
 
-            if (endDate === startDate) {
+            if (endDateInput.value < startDate) {
+                endDateInput.value = startDate;
+            }
+
+            if (endDateInput.value > maxEndDate) {
+                endDateInput.value = maxEndDate;
+            }
+
+            if (endDateInput.value === startDate) {
                 endTimeInput.min = startTime;
             } else {
                 endTimeInput.removeAttribute('min');
             }
 
-            if (endDate && endTime) {
+            if (endDateInput.value && endTime) {
                 const startDateTime = new Date(`${startDate}T${startTime}:00`);
-                const endDateTime = new Date(`${endDate}T${endTime}:00`);
+                const endDateTime = new Date(`${endDateInput.value}T${endTime}:00`);
 
                 if (endDateTime < startDateTime) {
                     endDateInput.value = startDate;
@@ -2240,8 +2265,8 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="endDate" title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Einddatum:</label>
-                    <input type="date" id="endDate" required title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                    <label for="endDate" title="Kies een einddatum tot 3 dagen na de startdatum">Einddatum:</label>
+                    <input type="date" id="endDate" required title="Kies een einddatum tot 3 dagen na de startdatum">
                 </div>
                 <div class="form-group">
                     <label for="endTime" title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Eindtijd:</label>
