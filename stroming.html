@@ -321,11 +321,25 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 
             diveSiteSelect.disabled = true;
             diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen laden...</option>';
+            
+            // Disable the fetch button while loading or when no dive sites are available
+            const fetchDataButton = document.getElementById('fetchDataButton');
+            if (fetchDataButton) {
+                fetchDataButton.disabled = true;
+            }
+
+            // Remove any existing error message
+            const existingError = document.getElementById('dive-sites-error');
+            if (existingError) {
+                existingError.remove();
+            }
 
             try {
                 const response = await fetch(locationsUrl);
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}`);
+                    const errorText = response.statusText || 'Unknown error';
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const data = await response.json();
@@ -372,9 +386,31 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 console.error('Error loading dive sites:', error);
                 diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen niet beschikbaar</option>';
                 diveSiteSelect.disabled = true;
+                
+                // Keep the fetch button disabled when there's an error
+                if (fetchDataButton) {
+                    fetchDataButton.disabled = true;
+                }
+                
+                // Show error message beneath the dropdown
+                const errorElement = document.createElement('div');
+                errorElement.id = 'dive-sites-error';
+                errorElement.style.color = '#d32f2f';
+                errorElement.style.marginTop = '8px';
+                errorElement.style.fontSize = '0.9em';
+                errorElement.textContent = `Fout bij laden duikplaatsen: ${error.message}`;
+                
+                const formGroup = diveSiteSelect.closest('.form-group');
+                if (formGroup) {
+                    formGroup.appendChild(errorElement);
+                }
             } finally {
                 if (availableDiveSites.length > 0) {
                     diveSiteSelect.disabled = false;
+                    // Enable the fetch button when dive sites are available
+                    if (fetchDataButton) {
+                        fetchDataButton.disabled = false;
+                    }
                 }
             }
         }
@@ -410,6 +446,12 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             // Reset UI state - clear previous results and show loading state
             diveWindowsContainer.innerHTML = '';
             resultsContainer.innerHTML = '';
+            
+            // Remove any existing error message
+            const existingError = document.getElementById('data-fetch-error');
+            if (existingError) {
+                existingError.remove();
+            }
             
             // Hide legend and show loading spinner to indicate data is being fetched
             legend.style.display = 'none';
@@ -451,10 +493,25 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             try {
                 // Make parallel API calls to fetch both speed and direction data simultaneously
                 // This is more efficient than sequential calls
-                const response = await fetch(url);
+                let response, response_w;
+                try {
+                    response = await fetch(url);
+                    response_w = await fetch(url_w);
+                } catch (fetchError) {
+                    // Network-level errors (CORS, DNS, etc.) - these don't return a response object
+                    throw new Error(`Netwerkfout: ${fetchError.message}`);
+                }
+                
+                // Check both responses for errors
+                let errorMessage = null;
+                if (!response.ok || !response_w.ok) {
+                    const speedError = !response.ok ? `Stroomsnelheid API: HTTP ${response.status} ${response.statusText || ''}` : null;
+                    const directionError = !response_w.ok ? `Stromingsrichting API: HTTP ${response_w.status} ${response_w.statusText || ''}` : null;
+                    errorMessage = [speedError, directionError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
+                    throw new Error(errorMessage);
+                }
+                
                 const data = await response.json();
-                // get direction information
-                const response_w = await fetch(url_w);
                 const data_w = await response_w.json();
                 
                 // Process and display the fetched data
@@ -470,7 +527,17 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             } catch (error) {
                 // Handle network errors, API errors, or JSON parsing errors
                 console.error('Error fetching data:', error);
-                resultsContainer.textContent = 'Fout bij het ophalen van gegevens. Probeer het opnieuw.';
+                
+                // Show error below the "Duikvensters" title
+                const errorElement = document.createElement('div');
+                errorElement.id = 'data-fetch-error';
+                errorElement.style.color = '#d32f2f';
+                errorElement.style.margin = '15px 0';
+                errorElement.style.fontSize = '1.1em';
+                errorElement.style.fontWeight = 'bold';
+                errorElement.textContent = `Fout bij ophalen stromingsgegevens: ${error.message}`;
+                
+                diveWindowsContainer.appendChild(errorElement);
             } finally {
                 // Always hide loading spinner when done, regardless of success or failure
                 loadingSpinner.style.display = 'none';
@@ -1550,6 +1617,12 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 		button[type="submit"]:active {
 			transform: translateY(1px);
 		}
+		button[type="submit"]:disabled {
+			background-color: #cccccc;
+			cursor: not-allowed;
+			opacity: 0.6;
+			transform: none;
+		}
 		/* Responsive design for smaller screens */
 		@media (max-width: 768px) {
             .form-map-layout {
@@ -2248,7 +2321,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                     <input type="time" id="endTime" required title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
                 </div>
             </div>
-            <button type="submit">Toon stroming</button>
+            <button type="submit" id="fetchDataButton">Toon stroming</button>
         </form>
         <div class="map-panel">
             <h2>Kaart duikgebied</h2>
