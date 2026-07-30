@@ -2,6 +2,7 @@
 
 Deze pagina helpt duikers in Zeeland om een inschatting te maken van stroming rond een gekozen duiklocatie en tijdsperiode.
 
+<a href='https://ko-fi.com/V4M3244P6B' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 ## Waarvoor kun je deze pagina gebruiken?
 
 Je gebruikt de pagina om:
