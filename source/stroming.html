@@ -1,0 +1,123 @@
+<!--
+Page to show the current forecast for a dive site in Zeeland, Netherlands.
+This page fetches data from the Rijkswaterstaat Waterberichtgeving API and displays it in a table format.
+The data includes current speed and direction, with color coding based on the current speed.
+
+The page also includes a legend to explain the color coding.
+The user can select a dive site and specify a time range to get the forecast data.
+The selection of dive sites is based on the available data from the Rijkswaterstaat API.
+The dates and times are set to default values of the current date and time, and two days later for the end date and time.
+
+This code is available under the GPL-3.0 license.
+See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duikstek stroming</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="manifest" href="site.webmanifest">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+    </script>
+    <script src="stroming.js" defer></script>
+    <link rel="stylesheet" href="stroming.css">
+</head>
+<body>
+    <!-- Fixed back to top button -->
+    <button id="fixed-back-to-top" class="fixed-back-to-top" onclick="scrollToTop()" aria-label="Terug naar boven">↑ Top</button>
+    
+    <h1>Duikstek stromingsvoorspelling</h1>
+    <div class="form-map-layout">
+        <form onsubmit="event.preventDefault(); fetchData();">
+            <div class="form-row">
+                <div class="form-group">
+                    <div class="dive-site-label">
+                        <label for="diveSite">
+                        <span>Duikplaats:</span>
+                        </label>
+                        <label for="onlyDiveLocations" class="checkbox-inline" title="Schakel tussen alleen bekende duiklocaties en alle meetpunten van Rijkswaterstaat">
+                            <input type="checkbox" id="onlyDiveLocations" checked title="Schakel tussen alleen bekende duiklocaties en alle meetpunten van Rijkswaterstaat">
+                            <span>Toon alleen duiklocaties</span>
+                        </label>
+                    </div>
+                    <select id="diveSite" required>
+                        <option value="" selected disabled>Duikplaatsen laden...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="startDate" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Startdatum:</label>
+                    <input type="date" id="startDate" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                </div>
+                <div class="form-group">
+                    <label for="startTime" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Starttijd:</label>
+                    <input type="time" id="startTime" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="endDate" title="Kies een einddatum tot 3 dagen na de startdatum">Einddatum:</label>
+                    <input type="date" id="endDate" required title="Kies een einddatum tot 3 dagen na de startdatum">
+                </div>
+                <div class="form-group">
+                    <label for="endTime" title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Eindtijd:</label>
+                    <input type="time" id="endTime" required title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                </div>
+            </div>
+            <button type="submit" id="fetchDataButton">Toon stroming</button>
+        </form>
+        <div class="map-panel">
+            <h2>Kaart duikgebied</h2>
+            <div id="dive-sites-map" aria-label="OpenStreetMap duikgebied"></div>
+        </div>
+    </div>
+    
+    <div id="loading-spinner" class="loading-spinner">
+        <div class="spinner"></div>
+        <div class="loading-text">Stromingsgegevens laden...</div>
+    </div>
+    
+    <div class="legend">
+        <h2>Legenda</h2>
+        <div><span class="red"></span> Duiken afgeraden (stroming > 30 cm/s)</div>
+        <div><span class="orange"></span> Alleen ervaren getijdenduikers (stroming 20-30 cm/s)</div>
+        <div><span class="light-green"></span> Alle getijdenduikers (stroming ≤ 20 cm/s)</div>
+        <div><span class="dark-green"></span> Stromingskentering (vrijwel geen stroming)</div>
+        <div><span class="light-blue"></span> Piekstroom (maximale stroming tussen kenteringen)</div>
+    </div>
+    <div id="dive-windows"></div>
+    <div id="results"></div>
+    <div id="source">
+        <span class="disclaimer-title">Disclaimer</span>
+        <span class="disclaimer-text">De stromingsgegevens op deze pagina zijn afkomstig van <a href="https://rwsos.rws.nl/viewer/map/oosterschelde/stroming">Rijkswaterstaat</a> en worden uitsluitend ter informatie aangeboden. Aan de weergegeven informatie kunnen geen rechten worden ontleend.<br>Duiken in de Oosterschelde brengt risico's met zich mee. Elke duiker is zelf verantwoordelijk voor een veilige duikplanning en dient de lokale omstandigheden — waaronder stroming, zicht, weer en getij — altijd ter plaatse te beoordelen voordat er wordt gedoken. Deze pagina vervangt niet het eigen oordeelsvermogen van de duiker.</span>
+    </div>
+    <div id="github-link">
+        <div class="link-group">
+            <a href="https://github.com/Dixet/rws-stroomsnelheid" target="_blank" rel="noopener noreferrer" aria-label="Bekijk dit project op GitHub">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
+                </svg>
+                <span>Bekijk op GitHub</span>
+            </a>
+            <span aria-hidden="true">•</span>
+            <a href="https://github.com/Dixet/rws-stroomsnelheid/issues" target="_blank" rel="noopener noreferrer" aria-label="Meld een probleem of doe een suggestie">
+                <span>Meld een probleem / doe een suggestie</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
