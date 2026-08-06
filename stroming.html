@@ -726,9 +726,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
 
                 const formatDateLabel = (timestamp) => {
-                    console.log('formatDateLabel called with timestamp:', timestamp);
                     const date = new Date(timestamp);
-                    console.log('date:', date);
                     const today = new Date();
                     const tomorrow = new Date();
                     tomorrow.setDate(today.getDate() + 1);
