@@ -388,6 +388,132 @@ function renderDiveSites() {
 }
 
 /**
+ * Gets moon phase data for the specified year from the USNO API 
+ *and returns an array of objects with phase and local date. 
+*/
+async function getMoonPhases(year) {
+    const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
+
+    try {
+        const response = await fetch(moonphaseUrl);
+
+        if (!response.ok) {
+            const errorText = response.statusText || 'Unknown error';
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        const data = await response.json();
+
+        const tideMap = {
+                "New Moon": "Springtij",
+                "Full Moon": "Springtij",
+                "First Quarter": "Dood tij",
+                "Last Quarter": "Dood tij"
+            };
+
+            const result = [];        
+
+            data.phasedata.forEach(entry => {
+                const [hours, minutes] = entry.time.split(':').map(Number);
+                const utcMillis = Date.UTC(entry.year, entry.month - 1, entry.day, hours, minutes);
+                const localDate = new Date(utcMillis);
+
+                // original moon phase entry
+                result.push({
+                    phase: entry.phase,
+                    date: localDate
+                });
+
+                // derived tide entry, 2 days later
+                const tideDate = new Date(localDate);
+                tideDate.setDate(tideDate.getDate() + 2);
+
+                result.push({
+                    phase: tideMap[entry.phase],
+                    date: tideDate
+                });
+            });
+
+            return result;
+    } catch (error) {
+        console.error('Error fetching moon phase data:', error);
+        throw error;
+    }
+}
+
+/*
+ * Fetches moon phase data for all years in the specified date range and returns a
+ * merged, sorted array.
+*/
+async function getMoonPhasesInRange(startDate, endDate) {
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+
+    // Build an array of years to fetch, e.g. [2025, 2026]
+    const years = [];
+    for (let y = startYear; y <= endYear; y++) {
+        years.push(y);
+    }
+
+    // Fetch all years in parallel rather than one-by-one
+    const results = await Promise.all(years.map(year => getMoonPhases(year)));
+
+    // Flatten the array-of-arrays into one array
+    const merged = results.flat();
+
+    // Sort by date, just in case (API returns per-year data already sorted,
+    // but merging two years' worth benefits from an explicit sort)
+    merged.sort((a, b) => a.date - b.date);
+
+    // Optional: filter down to just the requested date range
+    const filtered = merged.filter(entry => entry.date >= startDate && entry.date <= endDate);
+
+    return filtered;
+}
+
+/* 
+ * Adds moon phase information to each event in the API result based on the event's local date.
+ */
+function GetMoonPhaseForDate(timeStamp, moonPhases) {
+    // Build a lookup: local date string -> phase name, for fast matching
+
+    // Dutch translation of moon phases
+    const moonPhaseTranslations = {
+        'New Moon': 'Nieuwe Maan',
+        'First Quarter': 'Eerste kwartier',
+        'Full Moon': 'Volle Maan',
+        'Last Quarter': 'Laatste kwartier',
+        'Springtij': 'Springtij',
+        'Dood tij': 'Dood tij'
+    };
+    const moonPhaseIcons = {
+        'New Moon': 'images/newmoon.png',
+        'First Quarter': 'images/firstquarter.png',
+        'Full Moon': 'images/fullmoon.png',
+        'Last Quarter': 'images/lastquarter.png',
+        'Springtij': 'images/springtide.png',
+        'Dood tij': 'images/neaptide.png'
+    };
+
+    
+    
+    const phaseByDate = new Map();
+    moonPhases.forEach(mp => {
+        phaseByDate.set(mp.date.toDateString(), mp.phase);
+    });
+    const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
+    const key = eventDate.toDateString();
+    moonPhase = null;
+    moonPhaseIcon = null;
+    if (phaseByDate.has(key)) {
+        moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
+        moonPhaseIcon = moonPhaseIcons[phaseByDate.get(key)];
+        return { name: moonPhase, icon: moonPhaseIcon };
+    }
+
+    
+}
+
+/**
  * Loads available dive sites from the RWS locations API and fills the dive site select list.
  * Uses feature.properties.locationName as label and feature.properties.id as value.
  */
@@ -554,6 +680,8 @@ async function fetchData() {
         return;
     }
 
+    // Get the moon phases for the selected date range to display in the results
+    const moonphases = await getMoonPhasesInRange(startDateTime, endDateTime);
     // Construct ISO datetime strings from separate date and time inputs
     // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
     const localStartDateTimeString = `${startDate}T${startTime}:00`;
@@ -594,7 +722,7 @@ async function fetchData() {
         const data_w = await response_w.json();
         
         // Process and display the fetched data
-        displayResults(data, data_w, diveSiteName);
+        displayResults(data, data_w, diveSiteName, moonphases);
         
         // Scroll to dive windows section after displaying results (especially useful on mobile)
         setTimeout(() => {
@@ -624,8 +752,9 @@ async function fetchData() {
  * Creates dive windows visualization showing optimal diving periods and detailed current information.
  * @param {Object} data - Speed data from RWS API containing current measurements in m/s
  * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
+ * @param {Object} moonphases - Moon phase data for the time period
  */
-function displayResults(data ,data_w, diveSiteName) {
+function displayResults(data ,data_w, diveSiteName, moonphases) {
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
     const legend = document.querySelector('.legend');
@@ -1084,8 +1213,17 @@ function displayResults(data ,data_w, diveSiteName) {
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 const dateLabel = document.createElement('div');
+                const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
                 dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
+                if (moonPhase) {
+                    const moonIcon = document.createElement('img');
+                    moonIcon.src = moonPhase.icon;
+                    moonIcon.alt = moonPhase.name;
+                    moonIcon.title = moonPhase.name;
+                    moonIcon.className = 'moon-icon';
+                    dateLabel.appendChild(moonIcon);
+                }   
                 timelineRow.appendChild(dateLabel);
             }
             previousDate = divedate;
