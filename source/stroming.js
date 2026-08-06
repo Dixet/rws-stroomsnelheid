@@ -391,7 +391,7 @@ function renderDiveSites() {
  * Gets moon phase data for the specified year from the USNO API 
  *and returns an array of objects with phase and local date. 
 */
-async function loadMoonphaseData(year) {
+async function getMoonPhases(year) {
     const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
 
     try {
@@ -425,6 +425,36 @@ async function loadMoonphaseData(year) {
         console.error('Error fetching moon phase data:', error);
         throw error;
     }
+}
+
+/*
+ * Fetches moon phase data for all years in the specified date range and returns a
+ * merged, sorted array.
+*/
+async function getMoonPhasesInRange(startDate, endDate) {
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+
+    // Build an array of years to fetch, e.g. [2025, 2026]
+    const years = [];
+    for (let y = startYear; y <= endYear; y++) {
+        years.push(y);
+    }
+
+    // Fetch all years in parallel rather than one-by-one
+    const results = await Promise.all(years.map(year => getMoonPhases(year)));
+
+    // Flatten the array-of-arrays into one array
+    const merged = results.flat();
+
+    // Sort by date, just in case (API returns per-year data already sorted,
+    // but merging two years' worth benefits from an explicit sort)
+    merged.sort((a, b) => a.date - b.date);
+
+    // Optional: filter down to just the requested date range
+    const filtered = merged.filter(entry => entry.date >= startDate && entry.date <= endDate);
+
+    return filtered;
 }
 
 /**
@@ -594,6 +624,8 @@ async function fetchData() {
         return;
     }
 
+    const moonphases = await getMoonPhasesInRange(startDateTime, endDateTime);
+    console.log('Moon phases in range:', moonphases);
     // Construct ISO datetime strings from separate date and time inputs
     // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
     const localStartDateTimeString = `${startDate}T${startTime}:00`;
