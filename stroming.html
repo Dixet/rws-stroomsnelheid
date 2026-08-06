@@ -725,6 +725,29 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                  */
                 const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
 
+                const formatDateLabel = (timestamp) => {
+                    const date = new Date(timestamp);
+                    const today = new Date();
+                    const tomorrow = new Date();
+                    tomorrow.setDate(today.getDate() + 1);
+                    if (date.toDateString() === today.toDateString()) {
+                        return 'Vandaag';
+                    } else if (date.toDateString() === tomorrow.toDateString()) {
+                        return 'Morgen';
+                    } else {
+                        return formatDate(timestamp);
+                    }
+                };
+
+                /* returns the maximum width of a collection of elements in pixels. */
+                const getMaxElementWidth = (elements) => {
+                    const maxWidth = Math.max(
+                        ...Array.from(elements).map(bar => bar.getBoundingClientRect().width)
+                    );
+
+                     return maxWidth;
+                };
+
                 // Pre-calculate moving window extrema and derive slack/peak markers.
                 // Peak uses 5-hour window (±2.5h), slack uses 4-hour window (±2h).
                 const PEAK_WINDOW_HALF_MINUTES = 150;
@@ -1086,17 +1109,21 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 });
 
                 // Generate visual timeline bars for each diving window
+                previousDate = null; // Track previous date to avoid duplicate date labels
                 windows.forEach(window => {
                     // Create main container for this timeline row
                     const timelineRow = document.createElement('div');
                     timelineRow.className = 'timeline-row';
                     
-                    // Add date label for this diving window
-                    const dateLabel = document.createElement('div');
-                    dateLabel.className = 'timeline-date';
-                    dateLabel.textContent = formatDate(window.windowStart.timeStamp);
                     
-                    timelineRow.appendChild(dateLabel);
+                    const divedate = new Date(window.slackTime.timeStamp);
+                    if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
+                        const dateLabel = document.createElement('div');
+                        dateLabel.className = 'timeline-date';
+                        dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
+                        timelineRow.appendChild(dateLabel);
+                    }
+                    previousDate = divedate;
 
                     // Create container for the bar and labels
                     const timelineBarContainer = document.createElement('div');
@@ -1127,7 +1154,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                     
                     // Calculate consistent pixels-per-minute ratio for all timeline bars
                     // This ensures segments with the same duration have the same pixel width across all bars
-                    const maxTotalDuration = maxDuration + maxStartToSlackTime;
+                    const maxTotalDuration = maxDuration //+ maxStartToSlackTime;
                     const pixelsPerMinute = baseWidth / maxTotalDuration;
                     
                     // Scale bar width proportionally to window duration plus filler using consistent scale
@@ -1378,6 +1405,15 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 scrollHint.style.display = 'none'; // Hidden by default, shown via CSS media query
                 diveWindowsContainer.appendChild(scrollHint);
 
+                // update the width of the date label to match the dive window timeline bar width for better alignment
+                const dateLabels = timelineContainer.querySelectorAll('.timeline-date');
+                const bars = document.querySelectorAll('.timeline-bar');
+                const maxDateLabelWidth = getMaxElementWidth(bars);
+
+                dateLabels.forEach(label => {
+                    label.style.width = maxDateLabelWidth + 'px';
+                });
+
                 // PHASE 3: Create detailed current data table (collapsible section)
                 // Add collapsible header for detailed current information
                 const currentDetailsHeader = document.createElement('h2');
@@ -1483,7 +1519,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 resultsContainer.appendChild(detailsContainer);
                 
                 // Show the color-coded legend now that results are displayed
-                legend.style.display = 'block';
+                legend.style.display = 'inline-block';
             } else {
                 // Handle case where no data is available from the API
                 resultsContainer.textContent = 'No results found.';
@@ -1828,7 +1864,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             margin-bottom: 85px; /* Increased from 70px to accommodate raised slack labels */
             overflow: visible;
             position: relative; /* Ensure proper positioning context */
-            padding-top: 50px; /* Increased from 35px to ensure labels don't interfere with previous row */
+            padding-top: 90px; /* Increased from 35px to ensure labels don't interfere with previous row */
             min-width: 950px; /* Default minimum width */
         }
         
@@ -1852,13 +1888,29 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         }
         .timeline-date {
             position: absolute;
+            top: 0;
             left: 0;
-            width: 80px; /* Reduced width to better fit date content */
-            padding-top: 5px;
+            width: 100%; /* Reduced width to better fit date content */
+            padding-top: 0;
             text-align: left;
-            transform: translateX(0px); /* Position date at the left edge */
-            font-size: 0.9em;
+            transform: none; /* Position date at the left edge */
+            font-size: 1.0em;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            gap: 10px;             /* space between line and text */
         }
+        .timeline-date::before,
+        .timeline-date::after {
+            content: "";
+            flex: 1;                       /* each line fills remaining space equally */
+            height: 3px;
+            background-color: #ccc;        /* adjust to match your theme */
+        }
+
         .timeline-bar {
             height: 30px;
             display: flex;
@@ -1972,7 +2024,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         .timeline-bar-container {
             position: absolute;
             display: flex;
-            left: 100px; /* Position right after the date label (80px width + 20px gap) */
+            left: 0px; /* Position right after the date label (80px width + 20px gap) */
             min-width: 0; /* Prevent container from growing beyond parent width */
             max-width: calc(100% - 120px); /* Ensure container fits within parent */
         }
@@ -1980,14 +2032,14 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         /* Responsive positioning for timeline bar container */
         @media (min-width: 1400px) {
             .timeline-bar-container {
-                left: 120px; /* More space for larger screens */
+                left: 0px; /* More space for larger screens */
                 max-width: calc(100% - 140px);
             }
         }
         
         @media (min-width: 1200px) and (max-width: 1399px) {
             .timeline-bar-container {
-                left: 110px;
+                left: 0px;
                 max-width: calc(100% - 130px);
             }
         }
@@ -2064,8 +2116,14 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             color: #666;
         }
         .legend {
+            flex: 1;
             margin-top: 20px;
-            display: none; /* Hide legend by default */
+            display: none; /* make it only as wide as its content */
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .legend div {
             display: flex;
@@ -2078,6 +2136,10 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
             height: 20px;
             margin-right: 10px;
         }
+        .legend h2 {
+            margin: 0 0 10px 0;
+        }
+
         .legend .red {
             background-color: #ffcccc;
         }
@@ -2218,9 +2280,9 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 			}
 			
 			.timeline-date {
-				width: 60px; /* Reduced width for mobile */
+				width: 100%px; /* Reduced width for mobile */
 				font-size: 0.8em;
-				transform: translateX(0px);
+				transform: none;
 			}
 			
 			.timeline-bar {
@@ -2228,7 +2290,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 			}
 			
 			.timeline-bar-container {
-				left: 80px; /* 60px date width + 20px gap */
+				left: 0px; /* 60px date width + 20px gap */
 			}
 			
 			.timeline-labels span {
@@ -2312,8 +2374,8 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 			}
 			
 			.timeline-date {
-				width: 70px; /* Reduced width for tablet */
-				transform: translateX(0px);
+				width: 100%; /* Reduced width for tablet */
+				transform: none;
 			}
 			
 			.timeline-bar {
@@ -2321,7 +2383,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
 			}
 			
 			.timeline-bar-container {
-				left: 90px; /* 70px date width + 20px gap */
+				left: 0px; /* 70px date width + 20px gap */
 			}
 			
 			.timeline-row {
