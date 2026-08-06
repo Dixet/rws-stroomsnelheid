@@ -813,3 +813,10 @@ th {
         right: 15px;
     }
 }
+
+.moon-icon {
+    width: 1.3em;
+    height: 1.3em;
+    object-fit: contain;
+    vertical-align: middle;
+}

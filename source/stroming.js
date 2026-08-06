@@ -478,13 +478,24 @@ function GetMoonPhaseForDate(timeStamp, moonPhases) {
 
     // Dutch translation of moon phases
     const moonPhaseTranslations = {
-        'New Moon': '🌑',
-        'First Quarter': '🌓',
-        'Full Moon': '🌕',
-        'Last Quarter': '🌖',
-        'Springtij': '  (Springtij)',
-        'Dood tij': '  (Dood tij)'
+        'New Moon': 'Nieuwe Maan',
+        'First Quarter': 'Eerste kwartier',
+        'Full Moon': 'Volle Maan',
+        'Last Quarter': 'Laatste kwartier',
+        'Springtij': 'Springtij',
+        'Dood tij': 'Dood tij'
     };
+    const moonPhaseIcons = {
+        'New Moon': 'images/newmoon.png',
+        'First Quarter': 'images/firstquarter.png',
+        'Full Moon': 'images/fullmoon.png',
+        'Last Quarter': 'images/lastquarter.png',
+        'Springtij': 'images/springtide.png',
+        'Dood tij': 'images/neaptide.png'
+    };
+
+    
+    
     const phaseByDate = new Map();
     moonPhases.forEach(mp => {
         phaseByDate.set(mp.date.toDateString(), mp.phase);
@@ -492,11 +503,14 @@ function GetMoonPhaseForDate(timeStamp, moonPhases) {
     const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
     const key = eventDate.toDateString();
     moonPhase = null;
+    moonPhaseIcon = null;
     if (phaseByDate.has(key)) {
         moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
+        moonPhaseIcon = moonPhaseIcons[phaseByDate.get(key)];
+        return { name: moonPhase, icon: moonPhaseIcon };
     }
 
-    return moonPhase;
+    
 }
 
 /**
@@ -1201,10 +1215,14 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 const dateLabel = document.createElement('div');
                 const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
+                dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
                 if (moonPhase) {
-                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp) + '  ' + moonPhase 
-                } else {
-                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
+                    const moonIcon = document.createElement('img');
+                    moonIcon.src = moonPhase.icon;
+                    moonIcon.alt = moonPhase.name;
+                    moonIcon.title = moonPhase.name;
+                    moonIcon.className = 'moon-icon';
+                    dateLabel.appendChild(moonIcon);
                 }   
                 timelineRow.appendChild(dateLabel);
             }
