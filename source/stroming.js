@@ -457,6 +457,34 @@ async function getMoonPhasesInRange(startDate, endDate) {
     return filtered;
 }
 
+/* 
+ * Adds moon phase information to each event in the API result based on the event's local date.
+ */
+function GetMoonPhaseForDate(timeStamp, moonPhases) {
+    // Build a lookup: local date string -> phase name, for fast matching
+
+    // Dutch translation of moon phases
+    const moonPhaseTranslations = {
+        'New Moon': 'Nieuwe Maan',
+        'First Quarter': 'Eerste kwartier',
+        'Full Moon': 'Volle Maan',
+        'Last Quarter': 'Laatste kwartier',
+    };
+    console.log('moonPhases:', moonPhases);
+    const phaseByDate = new Map();
+    moonPhases.forEach(mp => {
+        phaseByDate.set(mp.date.toDateString(), mp.phase);
+    });
+    const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
+    const key = eventDate.toDateString();
+    moonPhase = null;
+    if (phaseByDate.has(key)) {
+        moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
+    }
+
+    return moonPhase;
+}
+
 /**
  * Loads available dive sites from the RWS locations API and fills the dive site select list.
  * Uses feature.properties.locationName as label and feature.properties.id as value.
@@ -624,8 +652,8 @@ async function fetchData() {
         return;
     }
 
+    // Get the moon phases for the selected date range to display in the results
     const moonphases = await getMoonPhasesInRange(startDateTime, endDateTime);
-    console.log('Moon phases in range:', moonphases);
     // Construct ISO datetime strings from separate date and time inputs
     // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
     const localStartDateTimeString = `${startDate}T${startTime}:00`;
@@ -666,7 +694,7 @@ async function fetchData() {
         const data_w = await response_w.json();
         
         // Process and display the fetched data
-        displayResults(data, data_w, diveSiteName);
+        displayResults(data, data_w, diveSiteName, moonphases);
         
         // Scroll to dive windows section after displaying results (especially useful on mobile)
         setTimeout(() => {
@@ -696,8 +724,9 @@ async function fetchData() {
  * Creates dive windows visualization showing optimal diving periods and detailed current information.
  * @param {Object} data - Speed data from RWS API containing current measurements in m/s
  * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
+ * @param {Object} moonphases - Moon phase data for the time period
  */
-function displayResults(data ,data_w, diveSiteName) {
+function displayResults(data ,data_w, diveSiteName, moonphases) {
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
     const legend = document.querySelector('.legend');
@@ -1156,8 +1185,13 @@ function displayResults(data ,data_w, diveSiteName) {
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 const dateLabel = document.createElement('div');
+                const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
-                dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
+                if (moonPhase) {
+                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp) + '  (' + moonPhase + ')';
+                } else {
+                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
+                }   
                 timelineRow.appendChild(dateLabel);
             }
             previousDate = divedate;
