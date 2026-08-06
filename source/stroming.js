@@ -388,6 +388,46 @@ function renderDiveSites() {
 }
 
 /**
+ * Gets moon phase data for the specified year from the USNO API 
+ *and returns an array of objects with phase and local date. 
+*/
+async function loadMoonphaseData(year) {
+    const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
+
+    try {
+        const response = await fetch(moonphaseUrl);
+
+        if (!response.ok) {
+            const errorText = response.statusText || 'Unknown error';
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        const data = await response.json();
+        
+        return data.phasedata.map(entry => {
+            const [hours, minutes] = entry.time.split(':').map(Number);
+
+            // Construct as UTC (Date.UTC treats month as 0-indexed, API gives 1-indexed)
+            const utcMillis = Date.UTC(entry.year, entry.month - 1, entry.day, hours, minutes);
+
+            // Wrapping in `new Date(utcMillis)` gives a Date object representing
+            // that exact instant — Date objects don't "store" a timezone,
+            // but any local getters (getHours(), getDate(), toLocaleString(), etc.)
+            // on it will automatically reflect the browser's local time zone.
+            const localDate = new Date(utcMillis);
+
+            return {
+                phase: entry.phase,
+                date: localDate
+            };
+        });
+
+    } catch (error) {
+        console.error('Error fetching moon phase data:', error);
+        throw error;
+    }
+}
+
+/**
  * Loads available dive sites from the RWS locations API and fills the dive site select list.
  * Uses feature.properties.locationName as label and feature.properties.id as value.
  */
