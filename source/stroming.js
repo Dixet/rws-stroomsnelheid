@@ -402,25 +402,38 @@ async function getMoonPhases(year) {
             throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         const data = await response.json();
-        
-        return data.phasedata.map(entry => {
-            const [hours, minutes] = entry.time.split(':').map(Number);
 
-            // Construct as UTC (Date.UTC treats month as 0-indexed, API gives 1-indexed)
-            const utcMillis = Date.UTC(entry.year, entry.month - 1, entry.day, hours, minutes);
-
-            // Wrapping in `new Date(utcMillis)` gives a Date object representing
-            // that exact instant — Date objects don't "store" a timezone,
-            // but any local getters (getHours(), getDate(), toLocaleString(), etc.)
-            // on it will automatically reflect the browser's local time zone.
-            const localDate = new Date(utcMillis);
-
-            return {
-                phase: entry.phase,
-                date: localDate
+        const tideMap = {
+                "New Moon": "Springtij",
+                "Full Moon": "Springtij",
+                "First Quarter": "Dood tij",
+                "Last Quarter": "Dood tij"
             };
-        });
 
+            const result = [];        
+
+            data.phasedata.forEach(entry => {
+                const [hours, minutes] = entry.time.split(':').map(Number);
+                const utcMillis = Date.UTC(entry.year, entry.month - 1, entry.day, hours, minutes);
+                const localDate = new Date(utcMillis);
+
+                // original moon phase entry
+                result.push({
+                    phase: entry.phase,
+                    date: localDate
+                });
+
+                // derived tide entry, 2 days later
+                const tideDate = new Date(localDate);
+                tideDate.setDate(tideDate.getDate() + 2);
+
+                result.push({
+                    phase: tideMap[entry.phase],
+                    date: tideDate
+                });
+            });
+
+            return result;
     } catch (error) {
         console.error('Error fetching moon phase data:', error);
         throw error;
@@ -465,12 +478,13 @@ function GetMoonPhaseForDate(timeStamp, moonPhases) {
 
     // Dutch translation of moon phases
     const moonPhaseTranslations = {
-        'New Moon': 'Nieuwe Maan',
-        'First Quarter': 'Eerste kwartier',
-        'Full Moon': 'Volle Maan',
-        'Last Quarter': 'Laatste kwartier',
+        'New Moon': '🌑',
+        'First Quarter': '🌓',
+        'Full Moon': '🌕',
+        'Last Quarter': '🌖',
+        'Springtij': '  (Springtij)',
+        'Dood tij': '  (Dood tij)'
     };
-    console.log('moonPhases:', moonPhases);
     const phaseByDate = new Map();
     moonPhases.forEach(mp => {
         phaseByDate.set(mp.date.toDateString(), mp.phase);
@@ -1188,7 +1202,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
                 if (moonPhase) {
-                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp) + '  (' + moonPhase + ')';
+                    dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp) + '  ' + moonPhase 
                 } else {
                     dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
                 }   
