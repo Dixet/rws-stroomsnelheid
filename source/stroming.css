@@ -820,3 +820,10 @@ th {
     object-fit: contain;
     vertical-align: middle;
 }
+
+.site-logo {
+    width: 1.3em;
+    height: 1.3em;
+    object-fit: contain;
+    vertical-align: bottom;
+}
