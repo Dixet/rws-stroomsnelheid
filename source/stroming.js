@@ -805,34 +805,6 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
          */
         const isDirectionChange = (dir1, dir2) => (dir1 > 180 && dir2 < 180) || (dir1 < 180 && dir2 > 180);
 
-        /**
-         * Format timestamp to display only time portion (HH:MM)
-         * @param {string} timestamp - UTC timestamp string
-         * @returns {string} - Formatted time string
-         */
-        const formatTime = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0,5);
-
-        /**
-         * Format timestamp to display only date portion
-         * @param {string} timestamp - UTC timestamp string
-         * @returns {string} - Formatted date string
-         */
-        const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
-
-        const formatDateLabel = (timestamp) => {
-            const date = new Date(timestamp);
-            const today = new Date();
-            const tomorrow = new Date();
-            tomorrow.setDate(today.getDate() + 1);
-            if (date.toDateString() === today.toDateString()) {
-                return 'Vandaag';
-            } else if (date.toDateString() === tomorrow.toDateString()) {
-                return 'Morgen';
-            } else {
-                return formatDate(timestamp);
-            }
-        };
-
         /* returns the maximum width of a collection of elements in pixels. */
         const getMaxElementWidth = (elements) => {
             const maxWidth = Math.max(
@@ -1706,6 +1678,26 @@ function formatDate(timestamp) {
 }
 
 /**
+ * Format date label to display only date portion, with "Vandaag" for today and "Morgen" for tomorrow.
+ * @param {string} timestamp - UTC timestamp string
+ * @returns {string} - Formatted date string
+ */
+function formatDateLabel(timestamp) {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    if (date.toDateString() === today.toDateString()) {
+        return 'Vandaag';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Morgen';
+    } else {
+        return formatDate(timestamp);
+    }
+};
+
+
+/**
  * Converts local datetime string to UTC format required by the RWS API.
  * Takes browser's local time and converts it to UTC for API requests.
  * @param {string} localstring - Local datetime string (format: YYYY-MM-DDTHH:MM:SS)
@@ -1796,7 +1788,7 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
     header.className = 'popup-card-header';
 
     const title = document.createElement('h2');
-    title.textContent = `Duikvenster ${formatTime(windowData.slackTime.timeStamp)}`;
+    title.textContent = `Duikvenster ${formatDateLabel(windowData.slackTime.timeStamp)} ${formatTime(windowData.slackTime.timeStamp)}`;
 
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
