@@ -1814,6 +1814,10 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
     if (clonedMoreInfo) {
         clonedMoreInfo.remove();
     }
+    const clonedDateLabel = clonedRow.querySelector('.timeline-date');
+    if (clonedDateLabel) {
+        clonedDateLabel.remove();
+    }
     timelineWrapper.appendChild(clonedRow);
     content.appendChild(timelineWrapper);
 
