@@ -765,36 +765,36 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         const speedEvents = data.results[0].events;
         const directionEvents = data_w.results[0].events;
 
-            // Map direction values by timestamp for robust timestamp alignment
-            const directionByTimestamp = new Map(
-                directionEvents
-                    .filter(evt => evt && evt.timeStamp)
-                    .map(evt => [evt.timeStamp, parseFloat(evt.value)])
-            );
+        // Map direction values by timestamp for robust timestamp alignment
+        const directionByTimestamp = new Map(
+            directionEvents
+                .filter(evt => evt && evt.timeStamp)
+                .map(evt => [evt.timeStamp, parseFloat(evt.value)])
+        );
 
-            // Create combined measurements array with speed and direction data, filtering out invalid entries
-            const currentMeasurements = speedEvents
-                .map((speedEvent) => {
-                    const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
-                    return {
-                        timeStamp: speedEvent.timeStamp,
-                        speed: parseFloat(speedEvent.value), // Current speed in m/s
-                        direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
-                            ? directionValue
-                            : null,
-                        isLowest: false, // Will be set during slack time calculation
-                        isPeak: false // Will be set during peak current calculation
-                    };
-                })
-                .filter(measurement => 
-                    !Number.isNaN(measurement.speed) &&
-                    measurement.speed !== null &&
-                    measurement.speed !== undefined &&
-                    measurement.direction !== null &&
-                    measurement.direction !== undefined &&
-                    !Number.isNaN(measurement.direction)
-                )
-                .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
+        // Create combined measurements array with speed and direction data, filtering out invalid entries
+        const currentMeasurements = speedEvents
+            .map((speedEvent) => {
+                const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
+                return {
+                    timeStamp: speedEvent.timeStamp,
+                    speed: parseFloat(speedEvent.value), // Current speed in m/s
+                    direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
+                        ? directionValue
+                        : null,
+                    isLowest: false, // Will be set during slack time calculation
+                    isPeak: false // Will be set during peak current calculation
+                };
+            })
+            .filter(measurement => 
+                !Number.isNaN(measurement.speed) &&
+                measurement.speed !== null &&
+                measurement.speed !== undefined &&
+                measurement.direction !== null &&
+                measurement.direction !== undefined &&
+                !Number.isNaN(measurement.direction)
+            )
+            .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
         /**
          * Calculate the difference in minutes between two timestamp objects
@@ -1047,8 +1047,8 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         diveWindowsContainer.appendChild(diveWindowsHeader);
 
         // Check if conditions are favorable throughout the entire period
-        const allSpeedsBelowTwenty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.2);
-        const allSpeedsBelowThirty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.3);
+        const allSpeedsBelowTwenty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.2);
+        const allSpeedsBelowThirty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.3);
 
         if (allSpeedsBelowTwenty) {
             // Existing green panel for very low current during the full period (< 20 cm/s)
@@ -1173,21 +1173,20 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             const timelineRow = document.createElement('div');
             timelineRow.className = 'timeline-row';
             
-            
+            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 const dateLabel = document.createElement('div');
-                const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
                 dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
-                if (moonPhase) {
+                if (rowMoonPhase) {
                     const moonIcon = document.createElement('img');
-                    moonIcon.src = moonPhase.icon;
-                    moonIcon.alt = moonPhase.name;
-                    moonIcon.title = moonPhase.name;
+                    moonIcon.src = rowMoonPhase.icon;
+                    moonIcon.alt = rowMoonPhase.name;
+                    moonIcon.title = rowMoonPhase.name;
                     moonIcon.className = 'moon-icon';
                     dateLabel.appendChild(moonIcon);
-                }   
+                }
                 timelineRow.appendChild(dateLabel);
             }
             previousDate = divedate;
@@ -1263,9 +1262,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             // Helper function to determine segment type based on current speed
             const getSegmentType = (speedInMs) => {
                 const speedInCms = speedInMs * 100;
-                if (speedInCms > 30) return 'strong'; // > 30 cm/s - red
-                if (speedInCms > 20) return 'moderate'; // 20-30 cm/s - orange  
-                return 'weak'; // ≤ 20 cm/s - green
+                if (speedInCms >= 30) return 'strong'; // >= 30 cm/s - red
+                if (speedInCms >= 20) return 'moderate'; // 20-30 cm/s - orange  
+                return 'weak'; // < 20 cm/s - green
             };
             
             // Create segments by analyzing speed changes
@@ -1468,14 +1467,14 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
 
             const openPopup = (event) => {
                 event.stopPropagation();
-                showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
+                showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
             };
 
             timelineRow.addEventListener('click', openPopup);
             timelineRow.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
                 }
             });
 
@@ -1483,7 +1482,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             timelineBarContainer.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
                 }
             });
 
@@ -1491,7 +1490,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             moreInfo.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
                 }
             });            
             
@@ -1500,6 +1499,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             timelineBarContainer.appendChild(timeLabels);
             timelineRow.appendChild(timelineBarContainer);
             timelineRow.appendChild(moreInfo);
+
             // Add this timeline row to the main container
             timelineContainer.appendChild(timelineRow);
         });
@@ -1768,7 +1768,7 @@ window.onload = function() {
  * @param {string} diveSiteName - The name of the selected dive site.
  * @param {HTMLElement} timelineRow - The timeline row element to clone.
  */
-function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
+function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) {
     const overlay = document.createElement('div');
     overlay.className = 'popup-overlay';
     overlay.tabIndex = -1;
@@ -1794,6 +1794,25 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
 
     const content = document.createElement('div');
     content.className = 'popup-card-content';
+
+    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, moonphases);
+    if (rowMoonPhase) {
+        const extraInfo = document.createElement('div');
+        extraInfo.className = 'popup-extra-info';
+
+        const moonIcon = document.createElement('img');
+        moonIcon.src = rowMoonPhase.icon;
+        moonIcon.alt = rowMoonPhase.name;
+        moonIcon.title = rowMoonPhase.name;
+        moonIcon.className = 'moon-icon';
+
+        const text = document.createElement('span');
+        text.textContent = " " + rowMoonPhase.name;
+
+        extraInfo.appendChild(moonIcon);
+        extraInfo.appendChild(text);
+        content.appendChild(extraInfo);
+    }
 
     const timelineWrapper = document.createElement('div');
     timelineWrapper.className = 'popup-timeline-wrapper';
