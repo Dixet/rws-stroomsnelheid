@@ -1476,14 +1476,14 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
 
             const openPopup = (event) => {
                 event.stopPropagation();
-                showDiveWindowPopup(window, diveSiteName, timelineRow);
+                showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
             };
 
             timelineRow.addEventListener('click', openPopup);
             timelineRow.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
                 }
             });
 
@@ -1491,7 +1491,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             timelineBarContainer.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
                 }
             });
 
@@ -1499,7 +1499,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             moreInfo.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
                 }
             });
 
@@ -1788,7 +1788,7 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
     header.className = 'popup-card-header';
 
     const title = document.createElement('h2');
-    title.textContent = `Duikvenster ${formatDateLabel(windowData.slackTime.timeStamp)} ${formatTime(windowData.slackTime.timeStamp)}`;
+    title.textContent = `Duikvenster ${diveSiteName} ${formatDateLabel(windowData.slackTime.timeStamp)} ${formatTime(windowData.slackTime.timeStamp)}`;
 
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
@@ -1803,21 +1803,9 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
     const content = document.createElement('div');
     content.className = 'popup-card-content';
 
-    const subtitle = document.createElement('p');
-    subtitle.textContent = `Extra informatie voor ${diveSiteName}.`; 
-    content.appendChild(subtitle);
-
     const timelineWrapper = document.createElement('div');
     timelineWrapper.className = 'popup-timeline-wrapper';
     const clonedRow = timelineRow.cloneNode(true);
-    const clonedMoreInfo = clonedRow.querySelector('.more-info');
-    if (clonedMoreInfo) {
-        clonedMoreInfo.remove();
-    }
-    const clonedDateLabel = clonedRow.querySelector('.timeline-date');
-    if (clonedDateLabel) {
-        clonedDateLabel.remove();
-    }
     timelineWrapper.appendChild(clonedRow);
     content.appendChild(timelineWrapper);
 

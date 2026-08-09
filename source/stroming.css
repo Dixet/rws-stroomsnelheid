@@ -849,9 +849,12 @@ th {
     min-height: 220px;
 }
 .popup-timeline-wrapper {
+    position: relative;
+    padding-top: 90px;
     overflow-x: auto;
     width: 100%;
-    min-height: 160px;
+    min-height: 260px;
+    box-sizing: border-box;
 }
 .popup-timeline-wrapper .timeline-row {
     margin-bottom: 0;
