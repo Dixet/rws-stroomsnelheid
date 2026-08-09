@@ -1491,6 +1491,45 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             const moreInfo = document.createElement('div');
             moreInfo.className = 'more-info';
             moreInfo.textContent = '🔍';
+            moreInfo.setAttribute('role', 'button');
+            moreInfo.setAttribute('aria-label', 'Bekijk extra informatie over dit duikvenster');
+            moreInfo.tabIndex = 0;
+            moreInfo.style.cursor = 'pointer';
+
+            timelineBarContainer.classList.add('interactive-timeline');
+            timelineBarContainer.setAttribute('role', 'button');
+            timelineBarContainer.setAttribute('aria-label', 'Open duikvenster detailkaart');
+            timelineBarContainer.tabIndex = 0;
+            timelineBarContainer.style.cursor = 'pointer';
+
+            const openPopup = (event) => {
+                event.stopPropagation();
+                showDiveWindowPopup(window, diveSiteName, timelineRow);
+            };
+
+            timelineRow.addEventListener('click', openPopup);
+            timelineRow.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                }
+            });
+
+            timelineBarContainer.addEventListener('click', openPopup);
+            timelineBarContainer.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                }
+            });
+
+            moreInfo.addEventListener('click', openPopup);
+            moreInfo.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, timelineRow);
+                }
+            });
 
             // Assemble the complete timeline row
             timelineBarContainer.appendChild(timelineBar);
@@ -1649,6 +1688,24 @@ function UTCToLocal(utcstring) {
 }
 
 /**
+ * Formats a UTC timestamp into local time string (HH:MM).
+ * @param {string} timestamp - UTC timestamp string from API.
+ * @returns {string} - Local time formatted as HH:MM.
+ */
+function formatTime(timestamp) {
+    return UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0, 5);
+}
+
+/**
+ * Formats a UTC timestamp into local date string.
+ * @param {string} timestamp - UTC timestamp string from API.
+ * @returns {string} - Local date string.
+ */
+function formatDate(timestamp) {
+    return UTCToLocal(timestamp).toLocaleString().split(', ')[0];
+}
+
+/**
  * Converts local datetime string to UTC format required by the RWS API.
  * Takes browser's local time and converts it to UTC for API requests.
  * @param {string} localstring - Local datetime string (format: YYYY-MM-DDTHH:MM:SS)
@@ -1719,6 +1776,81 @@ window.onload = function() {
     // Initialize back to top button visibility
     setupBackToTopButton();
 };
+
+/**
+ * Shows a popup card with the selected dive window visualization.
+ * The popup duplicates the clicked timeline row to preserve the exact visible dive window.
+ * @param {Object} windowData - The selected dive window object.
+ * @param {string} diveSiteName - The name of the selected dive site.
+ * @param {HTMLElement} timelineRow - The timeline row element to clone.
+ */
+function showDiveWindowPopup(windowData, diveSiteName, timelineRow) {
+    const overlay = document.createElement('div');
+    overlay.className = 'popup-overlay';
+    overlay.tabIndex = -1;
+
+    const card = document.createElement('div');
+    card.className = 'popup-card';
+
+    const header = document.createElement('div');
+    header.className = 'popup-card-header';
+
+    const title = document.createElement('h2');
+    title.textContent = `Duikvenster ${formatTime(windowData.slackTime.timeStamp)}`;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'popup-card-close';
+    closeButton.setAttribute('aria-label', 'Sluit duikvenster kaart');
+    closeButton.textContent = '✕';
+
+    header.appendChild(title);
+    header.appendChild(closeButton);
+    card.appendChild(header);
+
+    const content = document.createElement('div');
+    content.className = 'popup-card-content';
+
+    const subtitle = document.createElement('p');
+    subtitle.textContent = `Extra informatie voor ${diveSiteName}.`; 
+    content.appendChild(subtitle);
+
+    const timelineWrapper = document.createElement('div');
+    timelineWrapper.className = 'popup-timeline-wrapper';
+    const clonedRow = timelineRow.cloneNode(true);
+    const clonedMoreInfo = clonedRow.querySelector('.more-info');
+    if (clonedMoreInfo) {
+        clonedMoreInfo.remove();
+    }
+    timelineWrapper.appendChild(clonedRow);
+    content.appendChild(timelineWrapper);
+
+    card.appendChild(content);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const closePopup = () => {
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+    };
+
+    closeButton.addEventListener('click', closePopup);
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            closePopup();
+        }
+    });
+
+    const onKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            closePopup();
+            document.removeEventListener('keydown', onKeyDown);
+        }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    overlay.focus();
+}
 
 /**
  * Smoothly scroll to the top of the page
