@@ -269,6 +269,13 @@ th {
     background-color: #ccc;        /* adjust to match your theme */
 }
 
+
+.more-info {
+    left: 0;
+    position: absolute;
+}
+
+
 .timeline-bar {
     height: 30px;
     display: flex;
@@ -382,7 +389,7 @@ th {
 .timeline-bar-container {
     position: absolute;
     display: flex;
-    left: 0px; /* Position right after the date label (80px width + 20px gap) */
+    left: 25px; /* Position right after the more info label */
     min-width: 0; /* Prevent container from growing beyond parent width */
     max-width: calc(100% - 120px); /* Ensure container fits within parent */
 }
@@ -390,14 +397,14 @@ th {
 /* Responsive positioning for timeline bar container */
 @media (min-width: 1400px) {
     .timeline-bar-container {
-        left: 0px; /* More space for larger screens */
+        left: 25px; /* More space for larger screens */
         max-width: calc(100% - 140px);
     }
 }
 
 @media (min-width: 1200px) and (max-width: 1399px) {
     .timeline-bar-container {
-        left: 0px;
+        left: 25px;
         max-width: calc(100% - 130px);
     }
 }
@@ -666,7 +673,7 @@ th {
     }
     
     .timeline-bar-container {
-        left: 0px; /* 60px date width + 20px gap */
+        left: 25px; /* 60px date width + 20px gap */
     }
     
     .timeline-labels span {
@@ -754,7 +761,7 @@ th {
     }
     
     .timeline-bar-container {
-        left: 0px; /* 70px date width + 20px gap */
+        left: 25px; /* 70px date width + 20px gap */
     }
     
     .timeline-row {

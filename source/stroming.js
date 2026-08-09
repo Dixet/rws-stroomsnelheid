@@ -1488,11 +1488,15 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 timeLabels.appendChild(slackContainer);
             }
 
+            const moreInfo = document.createElement('div');
+            moreInfo.className = 'more-info';
+            moreInfo.textContent = '🔍';
+
             // Assemble the complete timeline row
             timelineBarContainer.appendChild(timelineBar);
             timelineBarContainer.appendChild(timeLabels);
             timelineRow.appendChild(timelineBarContainer);
-            
+            timelineRow.appendChild(moreInfo);
             // Add this timeline row to the main container
             timelineContainer.appendChild(timelineRow);
         });
