@@ -764,27 +764,38 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         // Combine speed and direction data into a single array for easier processing
         const speedEvents = data.results[0].events;
         const directionEvents = data_w.results[0].events;
-        
-        // Create combined measurements array with speed and direction data, filtering out invalid entries
-        const currentMeasurements = speedEvents
-            .map((speedEvent, index) => ({
-                timeStamp: speedEvent.timeStamp,
-                speed: parseFloat(speedEvent.value), // Current speed in m/s
-                direction: parseFloat(directionEvents[index].value), // Current direction in degrees
-                isLowest: false, // Will be set during slack time calculation
-                isPeak: false // Will be set during peak current calculation
-            }))
-            .filter(measurement => 
-                !isNaN(measurement.speed) && 
-                measurement.speed !== null && 
-                measurement.speed !== undefined &&
-                !isNaN(measurement.direction) && 
-                measurement.direction !== null && 
-                measurement.direction !== undefined
+
+            // Map direction values by timestamp for robust timestamp alignment
+            const directionByTimestamp = new Map(
+                directionEvents
+                    .filter(evt => evt && evt.timeStamp)
+                    .map(evt => [evt.timeStamp, parseFloat(evt.value)])
             );
 
-        // Helper functions for data processing and formatting
-        
+            // Create combined measurements array with speed and direction data, filtering out invalid entries
+            const currentMeasurements = speedEvents
+                .map((speedEvent) => {
+                    const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
+                    return {
+                        timeStamp: speedEvent.timeStamp,
+                        speed: parseFloat(speedEvent.value), // Current speed in m/s
+                        direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
+                            ? directionValue
+                            : null,
+                        isLowest: false, // Will be set during slack time calculation
+                        isPeak: false // Will be set during peak current calculation
+                    };
+                })
+                .filter(measurement => 
+                    !Number.isNaN(measurement.speed) &&
+                    measurement.speed !== null &&
+                    measurement.speed !== undefined &&
+                    measurement.direction !== null &&
+                    measurement.direction !== undefined &&
+                    !Number.isNaN(measurement.direction)
+                )
+                .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
+
         /**
          * Calculate the difference in minutes between two timestamp objects
          * @param {Object} start - Event object with timeStamp property
@@ -797,13 +808,32 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         };
 
         /**
-         * Determines if there's a significant direction change indicating tide turning
-         * A direction change occurs when one direction is >180° and the other is <180°
-         * @param {number} dir1 - First direction in degrees
-         * @param {number} dir2 - Second direction in degrees
-         * @returns {boolean} - True if significant direction change detected
+         * Format timestamp to display only time portion (HH:MM)
+         * @param {string} timestamp - UTC timestamp string
+         * @returns {string} - Formatted time string
          */
-        const isDirectionChange = (dir1, dir2) => (dir1 > 180 && dir2 < 180) || (dir1 < 180 && dir2 > 180);
+        const formatTime = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0,5);
+
+        /**
+         * Format timestamp to display only date portion
+         * @param {string} timestamp - UTC timestamp string
+         * @returns {string} - Formatted date string
+         */
+        const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
+
+        const formatDateLabel = (timestamp) => {
+            const date = new Date(timestamp);
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(today.getDate() + 1);
+            if (date.toDateString() === today.toDateString()) {
+                return 'Vandaag';
+            } else if (date.toDateString() === tomorrow.toDateString()) {
+                return 'Morgen';
+            } else {
+                return formatDate(timestamp);
+            }
+        };
 
         /* returns the maximum width of a collection of elements in pixels. */
         const getMaxElementWidth = (elements) => {
@@ -814,59 +844,114 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 return maxWidth;
         };
 
-        // Pre-calculate moving window extrema and derive slack/peak markers.
-        // Peak uses 5-hour window (±2.5h), slack uses 4-hour window (±2h).
-        const PEAK_WINDOW_HALF_MINUTES = 150;
-        const SLACK_WINDOW_HALF_MINUTES = 120;
         const FLOAT_TOLERANCE = 1e-9;
-        const EXTREMA_DEBOUNCE_THRESHOLD = 0.01; // m/s (1 cm/s)
+        const DIRECTION_CHANGE_THRESHOLD_DEGREES = 60;
 
-        const calculateWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
-            const centerTime = new Date(measurement.timeStamp).getTime();
-            let minSpeed = Number.POSITIVE_INFINITY;
-            let maxSpeed = Number.NEGATIVE_INFINITY;
-            const windowSpeeds = [];
+        const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
-            currentMeasurements.forEach((candidate) => {
-                const candidateTime = new Date(candidate.timeStamp).getTime();
-                const deltaMinutes = Math.abs(candidateTime - centerTime) / (1000 * 60);
+        const normalizeDirection = (direction) => {
+            if (typeof direction !== 'number' || Number.isNaN(direction)) {
+                return direction;
+            }
+            return ((direction % 360) + 360) % 360;
+        };
 
-                if (deltaMinutes <= windowHalfMinutes) {
-                    windowSpeeds.push(candidate.speed);
-                    minSpeed = Math.min(minSpeed, candidate.speed);
-                    maxSpeed = Math.max(maxSpeed, candidate.speed);
+        const isDirectionChange = (dir1, dir2) => {
+            const a = normalizeDirection(dir1);
+            const b = normalizeDirection(dir2);
+            const diff = Math.abs(a - b);
+            const shortestDistance = Math.min(diff, 360 - diff);
+            const oppositeDistance = Math.abs(180 - shortestDistance);
+            return oppositeDistance <= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+        };
+
+        const isLocalPeak = (index) => {
+            const speed = currentMeasurements[index].speed;
+            if (index === 0) {
+                return speed > currentMeasurements[index + 1].speed + FLOAT_TOLERANCE;
+            }
+            if (index === currentMeasurements.length - 1) {
+                return speed > currentMeasurements[index - 1].speed + FLOAT_TOLERANCE;
+            }
+            const prevSpeed = currentMeasurements[index - 1].speed;
+            const nextSpeed = currentMeasurements[index + 1].speed;
+            return speed >= prevSpeed - FLOAT_TOLERANCE &&
+                speed >= nextSpeed - FLOAT_TOLERANCE &&
+                (speed > prevSpeed + FLOAT_TOLERANCE || speed > nextSpeed + FLOAT_TOLERANCE);
+        };
+
+        const findNearestPeakBefore = (startIndex, endIndex) => {
+            let bestPeakIndex = -1;
+            let bestPeakSpeed = -Infinity;
+            for (let i = startIndex; i <= endIndex; i++) {
+                if (isLocalPeak(i)) {
+                    const speed = currentMeasurements[i].speed;
+                    if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && i > bestPeakIndex)) {
+                        bestPeakSpeed = speed;
+                        bestPeakIndex = i;
+                    }
                 }
-            });
+            }
+            if (bestPeakIndex !== -1) {
+                return bestPeakIndex;
+            }
 
-            const secondHighestSpeed = windowSpeeds
-                .filter(speed => speed < maxSpeed - FLOAT_TOLERANCE)
-                .reduce((highest, speed) => Math.max(highest, speed), Number.NEGATIVE_INFINITY);
+            let bestIndex = startIndex;
+            let bestSpeed = currentMeasurements[startIndex].speed;
+            for (let i = startIndex + 1; i <= endIndex; i++) {
+                const speed = currentMeasurements[i].speed;
+                if (speed > bestSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestSpeed) && i > bestIndex)) {
+                    bestSpeed = speed;
+                    bestIndex = i;
+                }
+            }
+            return bestIndex;
+        };
 
-            const secondLowestSpeed = windowSpeeds
-                .filter(speed => speed > minSpeed + FLOAT_TOLERANCE)
-                .reduce((lowest, speed) => Math.min(lowest, speed), Number.POSITIVE_INFINITY);
+        const findNearestPeakAfter = (startIndex, endIndex) => {
+            let bestPeakIndex = -1;
+            let bestPeakSpeed = -Infinity;
+            for (let i = startIndex; i <= endIndex; i++) {
+                if (isLocalPeak(i)) {
+                    const speed = currentMeasurements[i].speed;
+                    if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && (bestPeakIndex === -1 || i < bestPeakIndex))) {
+                        bestPeakSpeed = speed;
+                        bestPeakIndex = i;
+                    }
+                }
+            }
+            if (bestPeakIndex !== -1) {
+                return bestPeakIndex;
+            }
 
-            const peakSeparation = secondHighestSpeed === Number.NEGATIVE_INFINITY
-                ? 0
-                : maxSpeed - secondHighestSpeed;
+            let bestIndex = startIndex;
+            let bestSpeed = currentMeasurements[startIndex].speed;
+            for (let i = startIndex + 1; i <= endIndex; i++) {
+                const speed = currentMeasurements[i].speed;
+                if (speed > bestSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestSpeed) && i < bestIndex)) {
+                    bestSpeed = speed;
+                    bestIndex = i;
+                }
+            }
+            return bestIndex;
+        };
 
-            const slackSeparation = secondLowestSpeed === Number.POSITIVE_INFINITY
-                ? 0
-                : secondLowestSpeed - minSpeed;
+        const isLocalMinimum = (index) => {
+            const speed = currentMeasurements[index].speed;
+            if (index === 0) {
+                return speed < currentMeasurements[index + 1].speed - FLOAT_TOLERANCE;
+            }
+            if (index === currentMeasurements.length - 1) {
+                return speed < currentMeasurements[index - 1].speed - FLOAT_TOLERANCE;
+            }
+            const prevSpeed = currentMeasurements[index - 1].speed;
+            const nextSpeed = currentMeasurements[index + 1].speed;
+            return speed <= prevSpeed + FLOAT_TOLERANCE &&
+                speed <= nextSpeed + FLOAT_TOLERANCE &&
+                (speed < prevSpeed - FLOAT_TOLERANCE || speed < nextSpeed - FLOAT_TOLERANCE);
+        };
 
-            return {
-                minSpeed,
-                maxSpeed,
-                peakSeparation,
-                slackSeparation
-            };
-        });
-
-        const peakWindowExtrema = calculateWindowExtrema(PEAK_WINDOW_HALF_MINUTES);
-
-        // For slack detection, only include points that are part of a direction-change event
-        // so unrelated low speeds without a direction change cannot suppress a true slack.
-        const directionChangePointFlags = currentMeasurements.map(() => false);
+        const slackIndicesSet = new Set();
         currentMeasurements.forEach((measurement, index) => {
             if (index >= currentMeasurements.length - 1) {
                 return;
@@ -874,160 +959,67 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
 
             const nextMeasurement = currentMeasurements[index + 1];
             if (isDirectionChange(measurement.direction, nextMeasurement.direction)) {
-                directionChangePointFlags[index] = true;
-                directionChangePointFlags[index + 1] = true;
+                const slackIndex = measurement.speed <= nextMeasurement.speed ? index : index + 1;
+                slackIndicesSet.add(slackIndex);
             }
         });
 
-        const calculateSlackWindowExtrema = (windowHalfMinutes) => currentMeasurements.map((measurement) => {
-            const centerTime = new Date(measurement.timeStamp).getTime();
-            let minSpeed = Number.POSITIVE_INFINITY;
-            const candidateSpeeds = [];
+        currentMeasurements.forEach((measurement, index) => {
+            if (index > 0 && index < currentMeasurements.length - 1) {
+                const prevMeasurement = currentMeasurements[index - 1];
+                const nextMeasurement = currentMeasurements[index + 1];
+                if (isDirectionChange(prevMeasurement.direction, nextMeasurement.direction) && isLocalMinimum(index)) {
+                    slackIndicesSet.add(index);
+                }
+            }
+        });
 
-            currentMeasurements.forEach((candidate, candidateIndex) => {
-                if (!directionChangePointFlags[candidateIndex]) {
+        const dedupeSlackIndices = (indices) => {
+            const deduped = [];
+            indices.forEach((index) => {
+                if (deduped.length === 0) {
+                    deduped.push(index);
                     return;
                 }
-
-                const candidateTime = new Date(candidate.timeStamp).getTime();
-                const deltaMinutes = Math.abs(candidateTime - centerTime) / (1000 * 60);
-
-                if (deltaMinutes <= windowHalfMinutes) {
-                    candidateSpeeds.push(candidate.speed);
-                    minSpeed = Math.min(minSpeed, candidate.speed);
+                const previousIndex = deduped[deduped.length - 1];
+                if (
+                    index === previousIndex + 1 &&
+                    approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
+                ) {
+                    return;
                 }
+                deduped.push(index);
             });
+            return deduped;
+        };
 
-            const secondLowestSpeed = candidateSpeeds
-                .filter(speed => speed > minSpeed + FLOAT_TOLERANCE)
-                .reduce((lowest, speed) => Math.min(lowest, speed), Number.POSITIVE_INFINITY);
+        const slackIndices = dedupeSlackIndices(Array.from(slackIndicesSet).sort((a, b) => a - b));
 
-            const slackSeparation = secondLowestSpeed === Number.POSITIVE_INFINITY
-                ? 0
-                : secondLowestSpeed - minSpeed;
+        const peakIndices = new Set();
+        slackIndices.forEach((slackIndex, slackPosition) => {
+            const previousSlackIndex = slackPosition > 0 ? slackIndices[slackPosition - 1] : -1;
+            const nextSlackIndex = slackPosition < slackIndices.length - 1 ? slackIndices[slackPosition + 1] : currentMeasurements.length;
 
-            return {
-                minSpeed,
-                slackSeparation
-            };
+            const peakBeforeStart = previousSlackIndex + 1;
+            const peakBeforeEnd = Math.max(slackIndex - 1, peakBeforeStart);
+            if (peakBeforeStart <= peakBeforeEnd) {
+                peakIndices.add(findNearestPeakBefore(peakBeforeStart, peakBeforeEnd));
+            }
+
+            const peakAfterStart = slackIndex + 1;
+            const peakAfterEnd = Math.min(nextSlackIndex - 1, currentMeasurements.length - 1);
+            if (peakAfterStart <= peakAfterEnd) {
+                peakIndices.add(findNearestPeakAfter(peakAfterStart, peakAfterEnd));
+            }
         });
 
-        const slackWindowExtrema = calculateSlackWindowExtrema(SLACK_WINDOW_HALF_MINUTES);
-
-        const passesExtremaDebounce = (separation) =>
-            separation + FLOAT_TOLERANCE >= EXTREMA_DEBOUNCE_THRESHOLD;
-
-        const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
-
-        // Peak current: current frame equals the maximum speed in its 5-hour window
         currentMeasurements.forEach((measurement, index) => {
-            const windowInfo = peakWindowExtrema[index];
-            measurement.isPeak =
-                approximatelyEqual(measurement.speed, windowInfo.maxSpeed) &&
-                passesExtremaDebounce(windowInfo.peakSeparation);
+            measurement.isPeak = peakIndices.has(index);
         });
 
-        // Slack current: direction change (existing logic) AND current frame equals
-        // the minimum speed in its own 4-hour window.
-        const slackTimes = new Set();
-        currentMeasurements.forEach((measurement, index) => {
-            if (index >= currentMeasurements.length - 1) {
-                return;
-            }
-
-            const nextMeasurement = currentMeasurements[index + 1];
-            if (!isDirectionChange(measurement.direction, nextMeasurement.direction)) {
-                return;
-            }
-
-            const currentWindowInfo = slackWindowExtrema[index];
-            const nextWindowInfo = slackWindowExtrema[index + 1];
-
-            // Prefer the later point when both sides of the direction change
-            // have the same speed (tie).
-            const isTie = approximatelyEqual(measurement.speed, nextMeasurement.speed);
-            if (isTie) {
-                const nextIsWindowMinimum = approximatelyEqual(
-                    nextMeasurement.speed,
-                    nextWindowInfo.minSpeed
-                );
-
-                // For direction-change ties, allow the later point as slack even when
-                // the window separation is 0 (flat minima around the turning point).
-                const nextAcceptedAsSlack = nextIsWindowMinimum;
-
-                if (nextAcceptedAsSlack) {
-                    nextMeasurement.isLowest = true;
-                    slackTimes.add(index + 1);
-                }
-                return;
-            }
-
-            const currentIsWindowMinimum = approximatelyEqual(
-                measurement.speed,
-                currentWindowInfo.minSpeed
-            ) && passesExtremaDebounce(currentWindowInfo.slackSeparation);
-            if (currentIsWindowMinimum) {
-                measurement.isLowest = true;
-                slackTimes.add(index);
-            }
-
-            const nextIsWindowMinimum = approximatelyEqual(
-                nextMeasurement.speed,
-                nextWindowInfo.minSpeed
-            ) && passesExtremaDebounce(nextWindowInfo.slackSeparation);
-            if (nextIsWindowMinimum) {
-                nextMeasurement.isLowest = true;
-                slackTimes.add(index + 1);
-            }
+        slackIndices.forEach((slackIndex) => {
+            currentMeasurements[slackIndex].isLowest = true;
         });
-
-        const peakIndices = currentMeasurements
-            .map((measurement, index) => (measurement.isPeak ? index : -1))
-            .filter(index => index !== -1);
-
-        // If multiple slack markers exist between two peaks, keep only the one
-        // closest to the midpoint between those peaks.
-        const prunedSlackTimes = new Set(slackTimes);
-        if (peakIndices.length >= 2) {
-            for (let peakIndex = 0; peakIndex < peakIndices.length - 1; peakIndex++) {
-                const startPeakIndex = peakIndices[peakIndex];
-                const endPeakIndex = peakIndices[peakIndex + 1];
-
-                const candidateSlackIndices = Array.from(prunedSlackTimes)
-                    .filter(slackIndex => slackIndex > startPeakIndex && slackIndex < endPeakIndex)
-                    .sort((a, b) => a - b);
-
-                if (candidateSlackIndices.length <= 1) {
-                    continue;
-                }
-
-                const startPeakMs = new Date(currentMeasurements[startPeakIndex].timeStamp).getTime();
-                const endPeakMs = new Date(currentMeasurements[endPeakIndex].timeStamp).getTime();
-                const midpointMs = (startPeakMs + endPeakMs) / 2;
-
-                let bestSlackIndex = candidateSlackIndices[0];
-                let smallestDistance = Math.abs(new Date(currentMeasurements[bestSlackIndex].timeStamp).getTime() - midpointMs);
-
-                candidateSlackIndices.forEach((candidateIndex) => {
-                    const candidateDistance = Math.abs(new Date(currentMeasurements[candidateIndex].timeStamp).getTime() - midpointMs);
-                    if (candidateDistance < smallestDistance) {
-                        bestSlackIndex = candidateIndex;
-                        smallestDistance = candidateDistance;
-                    }
-                });
-
-                candidateSlackIndices.forEach((candidateIndex) => {
-                    if (candidateIndex !== bestSlackIndex) {
-                        prunedSlackTimes.delete(candidateIndex);
-                        currentMeasurements[candidateIndex].isLowest = false;
-                    }
-                });
-            }
-        }
-
-        // Convert slackTimes set to sorted array for downstream window creation
-        const slackIndices = Array.from(prunedSlackTimes).sort((a, b) => a - b);
 
         /**
          * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
@@ -1501,8 +1493,8 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                     event.preventDefault();
                     showDiveWindowPopup(window, diveSiteName, timelineBarContainer);
                 }
-            });
-
+            });            
+            
             // Assemble the complete timeline row
             timelineBarContainer.appendChild(timelineBar);
             timelineBarContainer.appendChild(timeLabels);
