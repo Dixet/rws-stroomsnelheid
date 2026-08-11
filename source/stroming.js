@@ -1291,6 +1291,27 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                     segmentStartType = currentType;
                 }
             }
+
+            const firstModerateSegment = segments.find(segment => segment.type === 'moderate') || null;
+            const lastModerateSegment = segments.slice().reverse().find(segment => segment.type === 'moderate') || null;
+            const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
+            const weakSlackSegment = segments.find(segment => {
+                if (segment.type !== 'weak') {
+                    return false;
+                }
+                const startMs = new Date(segment.startTime).getTime();
+                const endMs = new Date(segment.endTime).getTime();
+                return slackTimeMs >= startMs && slackTimeMs <= endMs;
+            }) || null;
+
+            window.advancedWindow = {
+                startTime: firstModerateSegment ? firstModerateSegment.startTime : null,
+                endTime: lastModerateSegment ? lastModerateSegment.endTime : null
+            };
+            window.beginnerWindow = {
+                startTime: weakSlackSegment ? weakSlackSegment.startTime : null,
+                endTime: weakSlackSegment ? weakSlackSegment.endTime : null
+            };
             
             // Create visual segments
             let isFirstVisible = true;
@@ -1796,21 +1817,75 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
     content.className = 'popup-card-content';
 
     const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, moonphases);
-    if (rowMoonPhase) {
+    const advancedWindow = windowData.advancedWindow || {};
+    const beginnerWindow = windowData.beginnerWindow || {};
+    const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
+    const hasBeginner = beginnerWindow.startTime && beginnerWindow.endTime;
+
+    if (rowMoonPhase || hasAdvanced || hasBeginner) {
         const extraInfo = document.createElement('div');
         extraInfo.className = 'popup-extra-info';
 
-        const moonIcon = document.createElement('img');
-        moonIcon.src = rowMoonPhase.icon;
-        moonIcon.alt = rowMoonPhase.name;
-        moonIcon.title = rowMoonPhase.name;
-        moonIcon.className = 'moon-icon';
+        if (rowMoonPhase) {
+            const header = document.createElement('div');
+            header.className = 'popup-extra-info-header';
 
-        const text = document.createElement('span');
-        text.textContent = " " + rowMoonPhase.name;
+            const moonIcon = document.createElement('img');
+            moonIcon.src = rowMoonPhase.icon;
+            moonIcon.alt = rowMoonPhase.name;
+            moonIcon.title = rowMoonPhase.name;
+            moonIcon.className = 'moon-icon';
 
-        extraInfo.appendChild(moonIcon);
-        extraInfo.appendChild(text);
+            const text = document.createElement('span');
+            text.textContent = rowMoonPhase.name;
+
+            header.appendChild(moonIcon);
+            header.appendChild(text);
+            extraInfo.appendChild(header);
+        }
+
+        const calculateDurationText = (startTime, endTime) => {
+            if (!startTime || !endTime) {
+                return 'n.v.t.';
+            }
+            const deltaMinutes = Math.round((new Date(endTime) - new Date(startTime)) / (1000 * 60));
+            const hours = Math.floor(deltaMinutes / 60);
+            const minutes = deltaMinutes % 60;
+            return hours > 0 ? `${hours}u ${minutes}m` : `${minutes}m`;
+        };
+
+        const createInfoRow = (labelText, startTime, endTime) => {
+            const row = document.createElement('tr');
+
+            const labelCell = document.createElement('td');
+            labelCell.className = 'popup-info-label';
+            labelCell.textContent = labelText;
+
+            const durationCell = document.createElement('td');
+            durationCell.className = 'popup-info-duration';
+            durationCell.textContent = calculateDurationText(startTime, endTime);
+
+            const timeCell = document.createElement('td');
+            timeCell.className = 'popup-info-time';
+            timeCell.textContent = startTime && endTime ? `${formatTime(startTime)} - ${formatTime(endTime)}` : 'n.v.t.';
+
+            row.appendChild(labelCell);
+            row.appendChild(durationCell);
+            row.appendChild(timeCell);
+            return row;
+        };
+
+        const extraInfoTable = document.createElement('table');
+        extraInfoTable.className = 'popup-extra-info-table';
+
+        if (hasBeginner) {
+            extraInfoTable.appendChild(createInfoRow('Duikvenster matig', beginnerWindow.startTime, beginnerWindow.endTime));
+        }
+        if (hasAdvanced) {
+            extraInfoTable.appendChild(createInfoRow('Duikvenster gevorderd', advancedWindow.startTime, advancedWindow.endTime));
+        }
+
+        extraInfo.appendChild(extraInfoTable);
         content.appendChild(extraInfo);
     }
 
