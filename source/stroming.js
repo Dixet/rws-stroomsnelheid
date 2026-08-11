@@ -1821,8 +1821,9 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
     const beginnerWindow = windowData.beginnerWindow || {};
     const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
     const hasBeginner = beginnerWindow.startTime && beginnerWindow.endTime;
+    const hasSlack = windowData.slackTime && windowData.slackTime.timeStamp;
 
-    if (rowMoonPhase || hasAdvanced || hasBeginner) {
+    if (rowMoonPhase || hasAdvanced || hasBeginner || hasSlack) {
         const extraInfo = document.createElement('div');
         extraInfo.className = 'popup-extra-info';
 
@@ -1854,7 +1855,7 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
             return hours > 0 ? `${hours}u ${minutes}m` : `${minutes}m`;
         };
 
-        const createInfoRow = (labelText, startTime, endTime) => {
+        const createInfoRow = (labelText, value1, value2) => {
             const row = document.createElement('tr');
 
             const labelCell = document.createElement('td');
@@ -1863,11 +1864,11 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
 
             const durationCell = document.createElement('td');
             durationCell.className = 'popup-info-duration';
-            durationCell.textContent = calculateDurationText(startTime, endTime);
+            durationCell.textContent = value1;
 
             const timeCell = document.createElement('td');
             timeCell.className = 'popup-info-time';
-            timeCell.textContent = startTime && endTime ? `${formatTime(startTime)} - ${formatTime(endTime)}` : 'n.v.t.';
+            timeCell.textContent = value2
 
             row.appendChild(labelCell);
             row.appendChild(durationCell);
@@ -1879,10 +1880,19 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
         extraInfoTable.className = 'popup-extra-info-table';
 
         if (hasBeginner) {
-            extraInfoTable.appendChild(createInfoRow('Duikvenster matig', beginnerWindow.startTime, beginnerWindow.endTime));
+            const durationText = calculateDurationText(beginnerWindow.startTime, beginnerWindow.endTime);
+            const timeText = beginnerWindow.startTime && beginnerWindow.endTime ? `${formatTime(beginnerWindow.startTime)} - ${formatTime(beginnerWindow.endTime)}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Duikvenster matig', durationText, timeText));
         }
         if (hasAdvanced) {
-            extraInfoTable.appendChild(createInfoRow('Duikvenster gevorderd', advancedWindow.startTime, advancedWindow.endTime));
+            const durationText = calculateDurationText(advancedWindow.startTime, advancedWindow.endTime);
+            const timeText = advancedWindow.startTime && advancedWindow.endTime ? `${formatTime(advancedWindow.startTime)} - ${formatTime(advancedWindow.endTime)}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Duikvenster gevorderd', durationText, timeText));
+        }
+        if (hasSlack) {
+            slackTimeText = windowData.slackTime.timeStamp ? formatTime(windowData.slackTime.timeStamp) : 'n.v.t.';
+            slackPeakText = windowData.tideIndicator ? `${windowData.tideIndicator}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Kentering', slackPeakText, slackTimeText));
         }
 
         extraInfo.appendChild(extraInfoTable);
