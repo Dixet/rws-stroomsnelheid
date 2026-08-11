@@ -1130,6 +1130,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             
             const duration = getMinutesBetween(windowStart, windowEnd);
             maxDuration = Math.max(maxDuration, duration);
+            const windowStartIndex = currentMeasurements.findIndex(m => m === windowStart);
+            const windowEndIndex = currentMeasurements.findIndex(m => m === windowEnd);
+            const windowMeasurements = currentMeasurements.slice(windowStartIndex, windowEndIndex + 1);
             
             windows.push({
                 windowStart,
@@ -1137,7 +1140,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 slackTime: currentMeasurements[slackIndex],
                 slackIndex: slackIndex,
                 duration,
-                tideIndicator: getTideIndicator(slackIndex)
+                tideIndicator: getTideIndicator(slackIndex),
+                windowStartIndex,
+                windowEndIndex,
+                measurements: windowMeasurements
             });
         });
 
@@ -1897,6 +1903,127 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
 
         extraInfo.appendChild(extraInfoTable);
         content.appendChild(extraInfo);
+    }
+
+    if (Array.isArray(windowData.measurements) && windowData.measurements.length > 0) {
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'popup-chart-container';
+
+        const chartTitle = document.createElement('div');
+        chartTitle.className = 'popup-chart-title';
+        chartTitle.textContent = 'Stroming tijdens dit duikvenster';
+        chartContainer.appendChild(chartTitle);
+
+        const chartCanvas = document.createElement('canvas');
+        chartContainer.appendChild(chartCanvas);
+        content.appendChild(chartContainer);
+
+        const labels = [];
+        const lowSpeed = [];
+        const mediumSpeed = [];
+        const highSpeed = [];
+
+        const getBand = (value) => {
+            if (value > 30) return 'high';
+            if (value > 20) return 'medium';
+            return 'low';
+        };
+
+        const getBoundaryThreshold = (bandA, bandB) => {
+            const pair = [bandA, bandB].sort().join('-');
+            if (pair === 'high-medium') return 30;
+            if (pair === 'low-medium') return 20;
+            return null;
+        };
+
+        windowData.measurements.forEach((item, index) => {
+            const value = Math.round(item.speed * 100);
+            const band = getBand(value);
+            labels.push(formatTime(item.timeStamp));
+            lowSpeed.push(band === 'low' ? value : null);
+            mediumSpeed.push(band === 'medium' ? value : null);
+            highSpeed.push(band === 'high' ? value : null);
+
+            const nextItem = windowData.measurements[index + 1];
+            if (nextItem) {
+                const nextValue = Math.round(nextItem.speed * 100);
+                const nextBand = getBand(nextValue);
+                if (nextBand !== band) {
+                    const threshold = getBoundaryThreshold(band, nextBand);
+                    if (threshold !== null) {
+                        const boundaryLabel = `${formatTime(nextItem.timeStamp)}\u200B`;
+                        labels.push(boundaryLabel);
+                        lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : null);
+                        mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
+                        highSpeed.push((band === 'high' || nextBand === 'high') && threshold === 30 ? 30 : null);
+                    }
+                }
+            }
+        });
+
+        new Chart(chartCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: '≤ 20 cm/s',
+                        data: lowSpeed,
+                        backgroundColor: 'rgba(34, 197, 94, 0.75)',
+                        borderColor: 'rgba(34, 197, 94, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 1
+                    },
+                    {
+                        label: '21-30 cm/s',
+                        data: mediumSpeed,
+                        backgroundColor: 'rgba(251, 191, 36, 0.75)',
+                        borderColor: 'rgba(234, 115, 22, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 2
+                    },
+                    {
+                        label: '> 30 cm/s',
+                        data: highSpeed,
+                        backgroundColor: 'rgba(244, 63, 94, 0.75)',
+                        borderColor: 'rgba(220, 38, 38, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Tijd' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        title: { display: true, text: 'Snelheid (cm/s)' },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
     }
 
     const timelineWrapper = document.createElement('div');

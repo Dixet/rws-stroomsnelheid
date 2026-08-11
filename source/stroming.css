@@ -903,6 +903,25 @@ th {
 .popup-info-time {
     color: #334155;
 }
+.popup-chart-container {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 18px;
+}
+.popup-chart-title {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.popup-chart-container canvas {
+    width: 100% !important;
+    min-height: 260px;
+    max-height: 340px;
+    display: block;
+}
 .popup-timeline-wrapper {
     position: relative;
     padding-top: 90px;
