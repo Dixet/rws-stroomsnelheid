@@ -2038,7 +2038,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                                 type: 'label',
                                 xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
                                 yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
-                                content: slackTideIndex !== -1 ? ['Kentering ' + slackTideTime] : [],
+                                content: slackTideIndex !== -1 ? [`${slackPeakText} ${slackTideTime}`] : [],
                                 //backgroundColor: 'rgba(0, 102, 0, 0.8)',
                                 color: 'rgba(0, 102, 0, 0.8)',
                                 font: {
