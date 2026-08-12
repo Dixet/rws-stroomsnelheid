@@ -922,18 +922,7 @@ th {
     max-height: 340px;
     display: block;
 }
-.popup-timeline-wrapper {
-    position: relative;
-    padding-top: 90px;
-    overflow-x: auto;
-    width: 100%;
-    min-height: 260px;
-    box-sizing: border-box;
-}
-.popup-timeline-wrapper .timeline-row {
-    margin-bottom: 0;
-    min-height: 160px;
-}
+
 .popup-card p {
     margin: 0 0 16px;
     color: #475569;

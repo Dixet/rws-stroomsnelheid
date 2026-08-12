@@ -1494,14 +1494,14 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
 
             const openPopup = (event) => {
                 event.stopPropagation();
-                showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
+                showDiveWindowPopup(window, diveSiteName, moonphases);
             };
 
             timelineRow.addEventListener('click', openPopup);
             timelineRow.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
                 }
             });
 
@@ -1509,7 +1509,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             timelineBarContainer.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
                 }
             });
 
@@ -1517,7 +1517,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             moreInfo.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    showDiveWindowPopup(window, diveSiteName, timelineBarContainer, moonphases);
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
                 }
             });            
             
@@ -1795,7 +1795,7 @@ window.onload = function() {
  * @param {string} diveSiteName - The name of the selected dive site.
  * @param {HTMLElement} timelineRow - The timeline row element to clone.
  */
-function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) {
+function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
     const overlay = document.createElement('div');
     overlay.className = 'popup-overlay';
     overlay.tabIndex = -1;
@@ -2064,12 +2064,6 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
             }
         });
     }
-
-    const timelineWrapper = document.createElement('div');
-    timelineWrapper.className = 'popup-timeline-wrapper';
-    const clonedRow = timelineRow.cloneNode(true);
-    timelineWrapper.appendChild(clonedRow);
-    content.appendChild(timelineWrapper);
 
     card.appendChild(content);
     overlay.appendChild(card);
