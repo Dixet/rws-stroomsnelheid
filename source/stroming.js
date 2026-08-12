@@ -1266,8 +1266,8 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             // Helper function to determine segment type based on current speed
             const getSegmentType = (speedInMs) => {
                 const speedInCms = speedInMs * 100;
-                if (speedInCms >= 30) return 'strong'; // >= 30 cm/s - red
-                if (speedInCms >= 20) return 'moderate'; // 20-30 cm/s - orange  
+                if (speedInCms > 30) return 'strong'; // >= 30 cm/s - red
+                if (speedInCms > 20) return 'moderate'; // 20-30 cm/s - orange  
                 return 'weak'; // < 20 cm/s - green
             };
             
