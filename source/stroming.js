@@ -1060,7 +1060,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             favorableConditionsPanel.style.fontSize = '1.1em';
             favorableConditionsPanel.style.fontWeight = 'bold';
             favorableConditionsPanel.style.textAlign = 'center';
-            favorableConditionsPanel.innerHTML = '🌊 Gunstige omstandigheden, duiken kan gedurende de hele periode worden gedaan!<br><span style="font-size: 0.9em; font-weight: normal; color: #0f5132;">Alle stromingen zijn ≤ 20 cm/s</span>';
+            favorableConditionsPanel.innerHTML = '🌊 Gunstige omstandigheden, duiken kan gedurende de hele periode worden gedaan!<br><span style="font-size: 0.9em; font-weight: normal; color: #0f5132;">De stroming is ≤ 20 cm/s</span>';
 
             diveWindowsContainer.appendChild(favorableConditionsPanel);
         } else if (allSpeedsBelowThirty) {
@@ -1075,7 +1075,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             experiencedDiversPanel.style.fontSize = '1.1em';
             experiencedDiversPanel.style.fontWeight = 'bold';
             experiencedDiversPanel.style.textAlign = 'center';
-            experiencedDiversPanel.innerHTML = '🌊 Duiken kan gedurende de hele periode worden gedaan voor ervaren getijdenduikers.<br><span style="font-size: 0.9em; font-weight: normal; color: #9a6700;">Alle stromingen zijn ≤ 30 cm/s</span>';
+            experiencedDiversPanel.innerHTML = '🌊 Duiken kan gedurende de hele periode worden gedaan voor ervaren getijdenduikers.<br><span style="font-size: 0.9em; font-weight: normal; color: #9a6700;">De stroming is ≤ 30 cm/s</span>';
 
             diveWindowsContainer.appendChild(experiencedDiversPanel);
         }
