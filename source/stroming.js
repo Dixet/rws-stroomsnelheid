@@ -1936,6 +1936,8 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
             return null;
         };
 
+  
+
         windowData.measurements.forEach((item, index) => {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
@@ -1960,6 +1962,16 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
                 }
             }
         });
+
+        // Find the slack tide index and time for the callout annotation
+        let slackTideIndex = -1;
+        let slackTideTime = null;
+        
+        if (windowData.slackTime && windowData.slackTime.timeStamp) {
+            slackTideTime = formatTime(windowData.slackTime.timeStamp);
+            // Find the index of the slack tide measurement in the array
+            slackTideIndex = labels.indexOf(slackTideTime);
+        }
 
         new Chart(chartCanvas.getContext('2d'), {
             type: 'line',
@@ -2019,7 +2031,34 @@ function showDiveWindowPopup(windowData, diveSiteName, timelineRow, moonphases) 
                 },
                 plugins: {
                     legend: { position: 'top' },
-                    tooltip: { mode: 'index', intersect: false }
+                    tooltip: { mode: 'index', intersect: false },
+                    annotation: {
+                        annotations: {
+                            slackTideCallout: {
+                                type: 'label',
+                                xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
+                                yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
+                                content: slackTideIndex !== -1 ? ['Kentering ' + slackTideTime] : [],
+                                //backgroundColor: 'rgba(0, 102, 0, 0.8)',
+                                color: 'rgba(0, 102, 0, 0.8)',
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                padding: 6,
+                                borderRadius: 4,
+                                position: 'top',
+                                xAdjust: 10,
+                                yAdjust: -180,
+                                callout: {
+                                    display: true,
+                                    borderColor: 'rgba(0, 102, 0, 0.8)',
+                                    borderWidth: 2
+                                },
+                                display: slackTideIndex !== -1
+                            }
+                        }
+                    }
                 },
                 interaction: { mode: 'index', intersect: false }
             }
