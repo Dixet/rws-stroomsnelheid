@@ -1,4 +1,5 @@
 <!--
+@Version: 1.0.0
 Page to show the current forecast for a dive site in Zeeland, Netherlands.
 This page fetches data from the Rijkswaterstaat Waterberichtgeving API and displays it in a table format.
 The data includes current speed and direction, with color coding based on the current speed.
@@ -31,6 +32,16 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin="">
+    </script>
+    <script 
+        src="https://unpkg.com/chart.js@4.5.1/dist/chart.umd.min.js"
+        integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
+        crossorigin="anonymous">
+    </script>
+    <script 
+        src="https://unpkg.com/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"
+        integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" 
+        crossorigin="anonymous">
     </script>
     <script src="stroming.js" defer></script>
     <link rel="stylesheet" href="stroming.css">

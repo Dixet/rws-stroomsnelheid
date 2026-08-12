@@ -260,6 +260,7 @@ th {
     align-items: center;
     text-align: center;
     gap: 10px;             /* space between line and text */
+    pointer-events: none;
 }
 .timeline-date::before,
 .timeline-date::after {
@@ -268,6 +269,18 @@ th {
     height: 3px;
     background-color: #ccc;        /* adjust to match your theme */
 }
+
+
+.more-info {
+    position: absolute;
+    top: 105px;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 10;
+    display: block;
+    visibility: visible;
+}
+
 
 .timeline-bar {
     height: 30px;
@@ -382,7 +395,7 @@ th {
 .timeline-bar-container {
     position: absolute;
     display: flex;
-    left: 0px; /* Position right after the date label (80px width + 20px gap) */
+    left: 25px; /* Position right after the more info label */
     min-width: 0; /* Prevent container from growing beyond parent width */
     max-width: calc(100% - 120px); /* Ensure container fits within parent */
 }
@@ -390,14 +403,14 @@ th {
 /* Responsive positioning for timeline bar container */
 @media (min-width: 1400px) {
     .timeline-bar-container {
-        left: 0px; /* More space for larger screens */
+        left: 25px; /* More space for larger screens */
         max-width: calc(100% - 140px);
     }
 }
 
 @media (min-width: 1200px) and (max-width: 1399px) {
     .timeline-bar-container {
-        left: 0px;
+        left: 25px;
         max-width: calc(100% - 130px);
     }
 }
@@ -427,6 +440,20 @@ th {
     font-size: 0.8em; /* Explicit font size to match tide-indicator */
     margin-top: 5px; /* Maintain alignment with other labels */
     line-height: 1;
+}
+.timeline-extra-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    margin-left: 25px;
+    font-size: 0.95em;
+    color: #334155;
+    width: calc(100% - 25px);
+}
+.timeline-extra-info-label {
+    font-weight: 700;
+    color: #0f172a;
 }
 /* Styles for the main table */
 #results table {
@@ -666,7 +693,16 @@ th {
     }
     
     .timeline-bar-container {
-        left: 0px; /* 60px date width + 20px gap */
+        left: 25px; /* 60px date width + 20px gap */
+    }
+
+    .more-info {
+        left: 0 px;
+        visibility: visible;
+        display: block;
+        z-index: 10;
+        top: 105px;
+        transform: translateY(-50%);
     }
     
     .timeline-labels span {
@@ -754,7 +790,7 @@ th {
     }
     
     .timeline-bar-container {
-        left: 0px; /* 70px date width + 20px gap */
+        left: 25px; /* 70px date width + 20px gap */
     }
     
     .timeline-row {
@@ -770,7 +806,129 @@ th {
 /* Scroll hint - hidden by default, shown on mobile */
 .scroll-hint {
     display: none;
-}		/* Hide timeline scroll bar on mobile for cleaner look */
+}
+.popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+    overflow-y: auto;
+}
+.popup-card {
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+    max-width: 980px;
+    width: 100%;
+    max-height: none;
+    min-height: 360px;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+}
+.popup-card-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.popup-card-header h2 {
+    margin: 0;
+    font-size: 1.15em;
+    color: #0f172a;
+}
+.popup-card-close {
+    border: none;
+    background: transparent;
+    color: #334155;
+    cursor: pointer;
+    font-size: 1.3em;
+    line-height: 1;
+    padding: 4px 8px;
+}
+.popup-card-close:hover,
+.popup-card-close:focus {
+    color: #0f172a;
+}
+.popup-card-content {
+    padding: 18px 20px 20px;
+    overflow: visible;
+    display: block;
+    min-height: 220px;
+}
+.popup-extra-info {
+    display: block;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    color: #0f172a;
+}
+.popup-extra-info-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.popup-extra-info .moon-icon {
+    width: 1.9em;
+    height: 1.9em;
+}
+.popup-extra-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+}
+.popup-extra-info-table td {
+    padding: 10px 12px;
+    border: none;
+    vertical-align: middle;
+}
+.popup-extra-info-table tr:first-child td {
+    border: none;
+}
+.popup-info-label {
+    width: 170px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.popup-info-duration,
+.popup-info-time {
+    color: #334155;
+}
+.popup-chart-container {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 18px;
+}
+.popup-chart-title {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.popup-chart-container canvas {
+    width: 100% !important;
+    min-height: 260px;
+    max-height: 340px;
+    display: block;
+}
+
+.popup-card p {
+    margin: 0 0 16px;
+    color: #475569;
+    line-height: 1.6;
+}
+/* Hide timeline scroll bar on mobile for cleaner look */
 @media (max-width: 768px) {
     .timeline-container::-webkit-scrollbar {
         height: 3px;

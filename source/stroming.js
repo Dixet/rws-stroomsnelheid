@@ -765,36 +765,36 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         const speedEvents = data.results[0].events;
         const directionEvents = data_w.results[0].events;
 
-            // Map direction values by timestamp for robust timestamp alignment
-            const directionByTimestamp = new Map(
-                directionEvents
-                    .filter(evt => evt && evt.timeStamp)
-                    .map(evt => [evt.timeStamp, parseFloat(evt.value)])
-            );
+        // Map direction values by timestamp for robust timestamp alignment
+        const directionByTimestamp = new Map(
+            directionEvents
+                .filter(evt => evt && evt.timeStamp)
+                .map(evt => [evt.timeStamp, parseFloat(evt.value)])
+        );
 
-            // Create combined measurements array with speed and direction data, filtering out invalid entries
-            const currentMeasurements = speedEvents
-                .map((speedEvent) => {
-                    const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
-                    return {
-                        timeStamp: speedEvent.timeStamp,
-                        speed: parseFloat(speedEvent.value), // Current speed in m/s
-                        direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
-                            ? directionValue
-                            : null,
-                        isLowest: false, // Will be set during slack time calculation
-                        isPeak: false // Will be set during peak current calculation
-                    };
-                })
-                .filter(measurement => 
-                    !Number.isNaN(measurement.speed) &&
-                    measurement.speed !== null &&
-                    measurement.speed !== undefined &&
-                    measurement.direction !== null &&
-                    measurement.direction !== undefined &&
-                    !Number.isNaN(measurement.direction)
-                )
-                .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
+        // Create combined measurements array with speed and direction data, filtering out invalid entries
+        const currentMeasurements = speedEvents
+            .map((speedEvent) => {
+                const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
+                return {
+                    timeStamp: speedEvent.timeStamp,
+                    speed: parseFloat(speedEvent.value), // Current speed in m/s
+                    direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
+                        ? directionValue
+                        : null,
+                    isLowest: false, // Will be set during slack time calculation
+                    isPeak: false // Will be set during peak current calculation
+                };
+            })
+            .filter(measurement => 
+                !Number.isNaN(measurement.speed) &&
+                measurement.speed !== null &&
+                measurement.speed !== undefined &&
+                measurement.direction !== null &&
+                measurement.direction !== undefined &&
+                !Number.isNaN(measurement.direction)
+            )
+            .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
         /**
          * Calculate the difference in minutes between two timestamp objects
@@ -1047,8 +1047,8 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         diveWindowsContainer.appendChild(diveWindowsHeader);
 
         // Check if conditions are favorable throughout the entire period
-        const allSpeedsBelowTwenty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.2);
-        const allSpeedsBelowThirty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed < 0.3);
+        const allSpeedsBelowTwenty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.2);
+        const allSpeedsBelowThirty = currentMeasurements.length > 0 && currentMeasurements.every(measurement => measurement.speed <= 0.3);
 
         if (allSpeedsBelowTwenty) {
             // Existing green panel for very low current during the full period (< 20 cm/s)
@@ -1130,6 +1130,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             
             const duration = getMinutesBetween(windowStart, windowEnd);
             maxDuration = Math.max(maxDuration, duration);
+            const windowStartIndex = currentMeasurements.findIndex(m => m === windowStart);
+            const windowEndIndex = currentMeasurements.findIndex(m => m === windowEnd);
+            const windowMeasurements = currentMeasurements.slice(windowStartIndex, windowEndIndex + 1);
             
             windows.push({
                 windowStart,
@@ -1137,7 +1140,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 slackTime: currentMeasurements[slackIndex],
                 slackIndex: slackIndex,
                 duration,
-                tideIndicator: getTideIndicator(slackIndex)
+                tideIndicator: getTideIndicator(slackIndex),
+                windowStartIndex,
+                windowEndIndex,
+                measurements: windowMeasurements
             });
         });
 
@@ -1173,21 +1179,20 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             const timelineRow = document.createElement('div');
             timelineRow.className = 'timeline-row';
             
-            
+            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 const dateLabel = document.createElement('div');
-                const moonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
                 dateLabel.className = 'timeline-date';
                 dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
-                if (moonPhase) {
+                if (rowMoonPhase) {
                     const moonIcon = document.createElement('img');
-                    moonIcon.src = moonPhase.icon;
-                    moonIcon.alt = moonPhase.name;
-                    moonIcon.title = moonPhase.name;
+                    moonIcon.src = rowMoonPhase.icon;
+                    moonIcon.alt = rowMoonPhase.name;
+                    moonIcon.title = rowMoonPhase.name;
                     moonIcon.className = 'moon-icon';
                     dateLabel.appendChild(moonIcon);
-                }   
+                }
                 timelineRow.appendChild(dateLabel);
             }
             previousDate = divedate;
@@ -1263,9 +1268,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             // Helper function to determine segment type based on current speed
             const getSegmentType = (speedInMs) => {
                 const speedInCms = speedInMs * 100;
-                if (speedInCms > 30) return 'strong'; // > 30 cm/s - red
-                if (speedInCms > 20) return 'moderate'; // 20-30 cm/s - orange  
-                return 'weak'; // ≤ 20 cm/s - green
+                if (speedInCms >= 30) return 'strong'; // >= 30 cm/s - red
+                if (speedInCms >= 20) return 'moderate'; // 20-30 cm/s - orange  
+                return 'weak'; // < 20 cm/s - green
             };
             
             // Create segments by analyzing speed changes
@@ -1292,6 +1297,27 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                     segmentStartType = currentType;
                 }
             }
+
+            const firstModerateSegment = segments.find(segment => segment.type === 'moderate') || null;
+            const lastModerateSegment = segments.slice().reverse().find(segment => segment.type === 'moderate') || null;
+            const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
+            const weakSlackSegment = segments.find(segment => {
+                if (segment.type !== 'weak') {
+                    return false;
+                }
+                const startMs = new Date(segment.startTime).getTime();
+                const endMs = new Date(segment.endTime).getTime();
+                return slackTimeMs >= startMs && slackTimeMs <= endMs;
+            }) || null;
+
+            window.advancedWindow = {
+                startTime: firstModerateSegment ? firstModerateSegment.startTime : null,
+                endTime: lastModerateSegment ? lastModerateSegment.endTime : null
+            };
+            window.beginnerWindow = {
+                startTime: weakSlackSegment ? weakSlackSegment.startTime : null,
+                endTime: weakSlackSegment ? weakSlackSegment.endTime : null
+            };
             
             // Create visual segments
             let isFirstVisible = true;
@@ -1452,11 +1478,55 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 timeLabels.appendChild(slackContainer);
             }
 
+            const moreInfo = document.createElement('div');
+            moreInfo.className = 'more-info';
+            moreInfo.textContent = '🔍';
+            moreInfo.setAttribute('role', 'button');
+            moreInfo.setAttribute('aria-label', 'Bekijk extra informatie over dit duikvenster');
+            moreInfo.tabIndex = 0;
+            moreInfo.style.cursor = 'pointer';
+
+            timelineBarContainer.classList.add('interactive-timeline');
+            timelineBarContainer.setAttribute('role', 'button');
+            timelineBarContainer.setAttribute('aria-label', 'Open duikvenster detailkaart');
+            timelineBarContainer.tabIndex = 0;
+            timelineBarContainer.style.cursor = 'pointer';
+
+            const openPopup = (event) => {
+                event.stopPropagation();
+                showDiveWindowPopup(window, diveSiteName, moonphases);
+            };
+
+            timelineRow.addEventListener('click', openPopup);
+            timelineRow.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
+                }
+            });
+
+            timelineBarContainer.addEventListener('click', openPopup);
+            timelineBarContainer.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
+                }
+            });
+
+            moreInfo.addEventListener('click', openPopup);
+            moreInfo.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showDiveWindowPopup(window, diveSiteName, moonphases);
+                }
+            });            
+            
             // Assemble the complete timeline row
             timelineBarContainer.appendChild(timelineBar);
             timelineBarContainer.appendChild(timeLabels);
             timelineRow.appendChild(timelineBarContainer);
-            
+            timelineRow.appendChild(moreInfo);
+
             // Add this timeline row to the main container
             timelineContainer.appendChild(timelineRow);
         });
@@ -1609,6 +1679,44 @@ function UTCToLocal(utcstring) {
 }
 
 /**
+ * Formats a UTC timestamp into local time string (HH:MM).
+ * @param {string} timestamp - UTC timestamp string from API.
+ * @returns {string} - Local time formatted as HH:MM.
+ */
+function formatTime(timestamp) {
+    return UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0, 5);
+}
+
+/**
+ * Formats a UTC timestamp into local date string.
+ * @param {string} timestamp - UTC timestamp string from API.
+ * @returns {string} - Local date string.
+ */
+function formatDate(timestamp) {
+    return UTCToLocal(timestamp).toLocaleString().split(', ')[0];
+}
+
+/**
+ * Format date label to display only date portion, with "Vandaag" for today and "Morgen" for tomorrow.
+ * @param {string} timestamp - UTC timestamp string
+ * @returns {string} - Formatted date string
+ */
+function formatDateLabel(timestamp) {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    if (date.toDateString() === today.toDateString()) {
+        return 'Vandaag';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Morgen';
+    } else {
+        return formatDate(timestamp);
+    }
+};
+
+
+/**
  * Converts local datetime string to UTC format required by the RWS API.
  * Takes browser's local time and converts it to UTC for API requests.
  * @param {string} localstring - Local datetime string (format: YYYY-MM-DDTHH:MM:SS)
@@ -1679,6 +1787,310 @@ window.onload = function() {
     // Initialize back to top button visibility
     setupBackToTopButton();
 };
+
+/**
+ * Shows a popup card with the selected dive window visualization.
+ * The popup duplicates the clicked timeline row to preserve the exact visible dive window.
+ * @param {Object} windowData - The selected dive window object.
+ * @param {string} diveSiteName - The name of the selected dive site.
+ * @param {HTMLElement} timelineRow - The timeline row element to clone.
+ */
+function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
+    const overlay = document.createElement('div');
+    overlay.className = 'popup-overlay';
+    overlay.tabIndex = -1;
+
+    const card = document.createElement('div');
+    card.className = 'popup-card';
+
+    const header = document.createElement('div');
+    header.className = 'popup-card-header';
+
+    const title = document.createElement('h2');
+    title.textContent = `Duikvenster ${diveSiteName} ${formatDateLabel(windowData.slackTime.timeStamp)} ${formatTime(windowData.slackTime.timeStamp)}`;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'popup-card-close';
+    closeButton.setAttribute('aria-label', 'Sluit duikvenster kaart');
+    closeButton.textContent = '✕';
+
+    header.appendChild(title);
+    header.appendChild(closeButton);
+    card.appendChild(header);
+
+    const content = document.createElement('div');
+    content.className = 'popup-card-content';
+
+    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, moonphases);
+    const advancedWindow = windowData.advancedWindow || {};
+    const beginnerWindow = windowData.beginnerWindow || {};
+    const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
+    const hasBeginner = beginnerWindow.startTime && beginnerWindow.endTime;
+    const hasSlack = windowData.slackTime && windowData.slackTime.timeStamp;
+
+    if (rowMoonPhase || hasAdvanced || hasBeginner || hasSlack) {
+        const extraInfo = document.createElement('div');
+        extraInfo.className = 'popup-extra-info';
+
+        if (rowMoonPhase) {
+            const header = document.createElement('div');
+            header.className = 'popup-extra-info-header';
+
+            const moonIcon = document.createElement('img');
+            moonIcon.src = rowMoonPhase.icon;
+            moonIcon.alt = rowMoonPhase.name;
+            moonIcon.title = rowMoonPhase.name;
+            moonIcon.className = 'moon-icon';
+
+            const text = document.createElement('span');
+            text.textContent = rowMoonPhase.name;
+
+            header.appendChild(moonIcon);
+            header.appendChild(text);
+            extraInfo.appendChild(header);
+        }
+
+        const calculateDurationText = (startTime, endTime) => {
+            if (!startTime || !endTime) {
+                return 'n.v.t.';
+            }
+            const deltaMinutes = Math.round((new Date(endTime) - new Date(startTime)) / (1000 * 60));
+            const hours = Math.floor(deltaMinutes / 60);
+            const minutes = deltaMinutes % 60;
+            return hours > 0 ? `${hours}u ${minutes}m` : `${minutes}m`;
+        };
+
+        const createInfoRow = (labelText, value1, value2) => {
+            const row = document.createElement('tr');
+
+            const labelCell = document.createElement('td');
+            labelCell.className = 'popup-info-label';
+            labelCell.textContent = labelText;
+
+            const durationCell = document.createElement('td');
+            durationCell.className = 'popup-info-duration';
+            durationCell.textContent = value1;
+
+            const timeCell = document.createElement('td');
+            timeCell.className = 'popup-info-time';
+            timeCell.textContent = value2
+
+            row.appendChild(labelCell);
+            row.appendChild(durationCell);
+            row.appendChild(timeCell);
+            return row;
+        };
+
+        const extraInfoTable = document.createElement('table');
+        extraInfoTable.className = 'popup-extra-info-table';
+
+        if (hasBeginner) {
+            const durationText = calculateDurationText(beginnerWindow.startTime, beginnerWindow.endTime);
+            const timeText = beginnerWindow.startTime && beginnerWindow.endTime ? `${formatTime(beginnerWindow.startTime)} - ${formatTime(beginnerWindow.endTime)}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Duikvenster matig', durationText, timeText));
+        }
+        if (hasAdvanced) {
+            const durationText = calculateDurationText(advancedWindow.startTime, advancedWindow.endTime);
+            const timeText = advancedWindow.startTime && advancedWindow.endTime ? `${formatTime(advancedWindow.startTime)} - ${formatTime(advancedWindow.endTime)}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Duikvenster gevorderd', durationText, timeText));
+        }
+        if (hasSlack) {
+            slackTimeText = windowData.slackTime.timeStamp ? formatTime(windowData.slackTime.timeStamp) : 'n.v.t.';
+            slackPeakText = windowData.tideIndicator ? `${windowData.tideIndicator}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Kentering', slackPeakText, slackTimeText));
+        }
+
+        extraInfo.appendChild(extraInfoTable);
+        content.appendChild(extraInfo);
+    }
+
+    if (Array.isArray(windowData.measurements) && windowData.measurements.length > 0) {
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'popup-chart-container';
+
+        const chartTitle = document.createElement('div');
+        chartTitle.className = 'popup-chart-title';
+        chartTitle.textContent = 'Stroming tijdens dit duikvenster';
+        chartContainer.appendChild(chartTitle);
+
+        const chartCanvas = document.createElement('canvas');
+        chartContainer.appendChild(chartCanvas);
+        content.appendChild(chartContainer);
+
+        const labels = [];
+        const lowSpeed = [];
+        const mediumSpeed = [];
+        const highSpeed = [];
+
+        const getBand = (value) => {
+            if (value > 30) return 'high';
+            if (value > 20) return 'medium';
+            return 'low';
+        };
+
+        const getBoundaryThreshold = (bandA, bandB) => {
+            const pair = [bandA, bandB].sort().join('-');
+            if (pair === 'high-medium') return 30;
+            if (pair === 'low-medium') return 20;
+            return null;
+        };
+
+  
+
+        windowData.measurements.forEach((item, index) => {
+            const value = Math.round(item.speed * 100);
+            const band = getBand(value);
+            labels.push(formatTime(item.timeStamp));
+            lowSpeed.push(band === 'low' ? value : null);
+            mediumSpeed.push(band === 'medium' ? value : null);
+            highSpeed.push(band === 'high' ? value : null);
+
+            const nextItem = windowData.measurements[index + 1];
+            if (nextItem) {
+                const nextValue = Math.round(nextItem.speed * 100);
+                const nextBand = getBand(nextValue);
+                if (nextBand !== band) {
+                    const threshold = getBoundaryThreshold(band, nextBand);
+                    if (threshold !== null) {
+                        const boundaryLabel = `${formatTime(nextItem.timeStamp)}\u200B`;
+                        labels.push(boundaryLabel);
+                        lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : null);
+                        mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
+                        highSpeed.push((band === 'high' || nextBand === 'high') && threshold === 30 ? 30 : null);
+                    }
+                }
+            }
+        });
+
+        // Find the slack tide index and time for the callout annotation
+        let slackTideIndex = -1;
+        let slackTideTime = null;
+        
+        if (windowData.slackTime && windowData.slackTime.timeStamp) {
+            slackTideTime = formatTime(windowData.slackTime.timeStamp);
+            // Find the index of the slack tide measurement in the array
+            slackTideIndex = labels.indexOf(slackTideTime);
+        }
+
+        new Chart(chartCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: '≤ 20 cm/s',
+                        data: lowSpeed,
+                        backgroundColor: 'rgba(34, 197, 94, 0.75)',
+                        borderColor: 'rgba(34, 197, 94, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 1
+                    },
+                    {
+                        label: '21-30 cm/s',
+                        data: mediumSpeed,
+                        backgroundColor: 'rgba(251, 191, 36, 0.75)',
+                        borderColor: 'rgba(234, 115, 22, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 2
+                    },
+                    {
+                        label: '> 30 cm/s',
+                        data: highSpeed,
+                        backgroundColor: 'rgba(244, 63, 94, 0.75)',
+                        borderColor: 'rgba(220, 38, 38, 0.9)',
+                        fill: true,
+                        spanGaps: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        order: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Tijd' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        title: { display: true, text: 'Snelheid (cm/s)' },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { mode: 'index', intersect: false },
+                    annotation: {
+                        annotations: {
+                            slackTideCallout: {
+                                type: 'label',
+                                xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
+                                yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
+                                content: slackTideIndex !== -1 ? ['Kentering ' + slackTideTime] : [],
+                                //backgroundColor: 'rgba(0, 102, 0, 0.8)',
+                                color: 'rgba(0, 102, 0, 0.8)',
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                padding: 6,
+                                borderRadius: 4,
+                                position: 'top',
+                                xAdjust: 10,
+                                yAdjust: -180,
+                                callout: {
+                                    display: true,
+                                    borderColor: 'rgba(0, 102, 0, 0.8)',
+                                    borderWidth: 2
+                                },
+                                display: slackTideIndex !== -1
+                            }
+                        }
+                    }
+                },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
+    }
+
+    card.appendChild(content);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const closePopup = () => {
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+    };
+
+    closeButton.addEventListener('click', closePopup);
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            closePopup();
+        }
+    });
+
+    const onKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            closePopup();
+            document.removeEventListener('keydown', onKeyDown);
+        }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    overlay.focus();
+}
 
 /**
  * Smoothly scroll to the top of the page
