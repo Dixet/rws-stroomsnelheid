@@ -845,7 +845,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         };
 
         const FLOAT_TOLERANCE = 1e-9;
-        const DIRECTION_CHANGE_THRESHOLD_DEGREES = 60;
+        const DIRECTION_CHANGE_THRESHOLD_DEGREES = 100;
 
         const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
@@ -860,9 +860,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             const a = normalizeDirection(dir1);
             const b = normalizeDirection(dir2);
             const diff = Math.abs(a - b);
-            const shortestDistance = Math.min(diff, 360 - diff);
-            const oppositeDistance = Math.abs(180 - shortestDistance);
-            return oppositeDistance <= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+            return diff >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
         };
 
         const isLocalPeak = (index) => {
