@@ -783,7 +783,12 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                         ? directionValue
                         : null,
                     isLowest: false, // Will be set during slack time calculation
-                    isPeak: false // Will be set during peak current calculation
+                    isPeak: false, // Will be set during peak current calculation
+                    isLocalLow: false, // Will be set during slack time calculation
+                    isLocalPeak: false, // Will be set during peak current calculation
+                    signed: null, // Will be set during mean direction calculation
+                    signChange: false, // Will be set during sign change detection
+                    index: null // Will be set during iteration for local peak/low detection
                 };
             })
             .filter(measurement => 
@@ -861,6 +866,42 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             const b = normalizeDirection(dir2);
             const diff = Math.abs(a - b);
             return diff >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+        };
+
+        const isSignChange = (value, beforevalue, aftervalue) => {
+            if (typeof value !== 'number' || typeof beforevalue !== 'number' || typeof aftervalue !== 'number') {
+                return false;
+            }
+            return (value < 0 && beforevalue >= 0) || (value >= 0 && beforevalue < 0) || (value < 0 && aftervalue >= 0) || (value >= 0 && aftervalue < 0); 
+        };
+
+        const toRadians = (degrees) => degrees * (Math.PI / 180);
+        const toDegrees = (radians) => radians * (180 / Math.PI);
+
+        const calculateTheta0  = (measurements) => {
+            // filter low speed measurements to avoid noise in theta0 calculation
+            const lowSpeedThreshold = 0.1; // m/s
+            const filteredMeasurements = measurements.filter(entry => entry.speed > lowSpeedThreshold);
+
+            if (filteredMeasurements.length === 0) {
+                return null; // No valid measurements to calculate theta0
+            } else {
+                const sumCos = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.cos(toRadians(entry.direction * 2))), 0);
+                const sumSin = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.sin(toRadians(entry.direction * 2))), 0);
+                const meanDirectionRad = Math.atan2(sumSin, sumCos);
+                const meanDirectionDeg = toDegrees(meanDirectionRad);
+                const theta0 = ((meanDirectionDeg /2 ) % 360); 
+                return Math.abs(theta0);
+            }
+
+        };
+
+        const calculateSigned = (snelheid, richting, theta0) => {
+            if (typeof snelheid !== 'number' || typeof richting !== 'number' || typeof theta0 !== 'number') {
+                return null;
+            }
+            const signedSpeed = snelheid * Math.cos(toRadians(richting - theta0));
+            return signedSpeed;
         };
 
         const isLocalPeak = (index) => {
@@ -949,74 +990,136 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 (speed < prevSpeed - FLOAT_TOLERANCE || speed < nextSpeed - FLOAT_TOLERANCE);
         };
 
-        const slackIndicesSet = new Set();
-        currentMeasurements.forEach((measurement, index) => {
+
+        // add helpers to the measurements for later use
+        const theta0 = calculateTheta0(currentMeasurements);
+        currentMeasurements.forEach((measurement,index) => {
             if (index >= currentMeasurements.length - 1) {
                 return;
             }
 
             const nextMeasurement = currentMeasurements[index + 1];
-            if (isDirectionChange(measurement.direction, nextMeasurement.direction)) {
-                const slackIndex = measurement.speed <= nextMeasurement.speed ? index : index + 1;
-                slackIndicesSet.add(slackIndex);
-            }
+            const previousMeasurement = index > 0 ? currentMeasurements[index - 1] : null;
+            measurement.signed = calculateSigned(measurement.speed, measurement.direction, theta0);
+
+            const signChange = previousMeasurement ? isSignChange(measurement.signed, previousMeasurement.signed, calculateSigned(nextMeasurement.speed, nextMeasurement.direction, theta0)) : false;
+            measurement.signChange = signChange;
+            measurement.isLocalPeak = isLocalPeak(index);
+            measurement.isLocalLow = isLocalMinimum(index);
+            measurement.indexnumber = index;
         });
 
-        currentMeasurements.forEach((measurement, index) => {
-            if (index > 0 && index < currentMeasurements.length - 1) {
-                const prevMeasurement = currentMeasurements[index - 1];
-                const nextMeasurement = currentMeasurements[index + 1];
-                if (isDirectionChange(prevMeasurement.direction, nextMeasurement.direction) && isLocalMinimum(index)) {
-                    slackIndicesSet.add(index);
+        const slackTideCandidates = currentMeasurements.filter((measurement) => {
+            return measurement.isLocalLow && measurement.signChange;
+        }); 
+
+        /**
+         * Filtert valse kentering-kandidaten (door "klotsen") uit een lijst van
+         * signChange-kandidaten. Kandidaten die kort na elkaar vallen (binnen
+         * clusterWindowMs) worden als één cluster gezien; per cluster wordt alleen
+         * de kandidaat met de laagste snelheid (dichtst bij echte stilstand)
+         * behouden. Bij gelijke snelheid wint de eerste (vroegste) kandidaat.
+         *
+         * @param {Array} candidates - lijst van kentering-kandidaten, elk met
+         *   minimaal { timeStamp: string (ISO), speed: number }.
+         *   Moet al gesorteerd zijn op timeStamp oplopend.
+         * @param {number} clusterWindowMs - max tijd tussen opeenvolgende
+         *   kandidaten om nog tot hetzelfde cluster te horen (default 2 uur).
+         * @returns {Array} gefilterde lijst met alleen de "echte" kenteringen,
+         *   in dezelfde volgorde als de input.
+         */
+        const filterSlackTideCandidates = (candidates) => {
+            if (!candidates || candidates.length === 0) return [];
+
+            const clusterWindowMs = 2 * 60 * 60 * 1000 // 2 uur in milliseconden
+
+            // Zorg dat we op tijd sorteren, voor het geval de input dat nog niet is
+            const sorted = [...candidates].sort(
+                (a, b) => new Date(a.timeStamp) - new Date(b.timeStamp)
+            );
+
+            // Stap 1: groepeer opeenvolgende kandidaten in clusters
+            // ("chained clustering": zolang het gat met de vórige kandidaat
+            // binnen het venster valt, blijft het dezelfde cluster)
+            const clusters = [];
+            let currentCluster = [sorted[0]];
+
+            for (let i = 1; i < sorted.length; i++) {
+                const prevTime = new Date(sorted[i - 1].timeStamp).getTime();
+                const currTime = new Date(sorted[i].timeStamp).getTime();
+
+                if (currTime - prevTime <= clusterWindowMs) {
+                    currentCluster.push(sorted[i]);
+                } else {
+                    clusters.push(currentCluster);
+                    currentCluster = [sorted[i]];
                 }
             }
-        });
+            clusters.push(currentCluster);
 
-        const dedupeSlackIndices = (indices) => {
-            const deduped = [];
-            indices.forEach((index) => {
-                if (deduped.length === 0) {
-                    deduped.push(index);
-                    return;
+            // Stap 2: kies per cluster de kandidaat met de laagste snelheid
+            // (dichtst bij echte stilstand); bij gelijkspel de eerste (vroegste)
+            const winners = clusters.map((cluster) => {
+                let best = cluster                                                                      [0];
+                for (let i = 1; i < cluster.length; i++) {
+                    if (cluster[i].speed < best.speed) {
+                        best = cluster[i];
+                    }
+                    // bij gelijke snelheid: best blijft de eerder gevonden
+                    // (= eerdere) kandidaat, dus geen actie nodig
                 }
-                const previousIndex = deduped[deduped.length - 1];
-                if (
-                    index === previousIndex + 1 &&
-                    approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
-                ) {
-                    return;
-                }
-                deduped.push(index);
+                return best;
             });
-            return deduped;
-        };
 
-        const slackIndices = dedupeSlackIndices(Array.from(slackIndicesSet).sort((a, b) => a - b));
+            return winners;
+        }
+
+        // const dedupeSlackIndices = (indices) => {
+        //     const deduped = [];
+        //     indices.forEach((index) => {
+        //         if (deduped.length === 0) {
+        //             deduped.push(index);
+        //             return;
+        //         }
+        //         const previousIndex = deduped[deduped.length - 1];
+        //         if (
+        //             index === previousIndex + 1 &&
+        //             approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
+        //         ) {
+        //             return;
+        //         }
+        //         deduped.push(index);
+        //     });
+        //     return deduped;
+        // };
+
+        //const slackIndices = dedupeSlackIndices(Array.from(slackIndicesCandidates).sort((a, b) => a - b));
+        const slackTides = filterSlackTideCandidates(Array.from(slackTideCandidates).sort((a, b) => a - b));
 
         const peakIndices = new Set();
-        slackIndices.forEach((slackIndex, slackPosition) => {
-            const previousSlackIndex = slackPosition > 0 ? slackIndices[slackPosition - 1] : -1;
-            const nextSlackIndex = slackPosition < slackIndices.length - 1 ? slackIndices[slackPosition + 1] : currentMeasurements.length;
+        slackTides.forEach((slackTide, slackPosition) => {
+            const previousSlackIndex = slackPosition > 0 ? slackTides[slackPosition - 1].indexnumber : -1;
+            const nextSlackIndex = slackPosition < slackTides.length - 1 ? slackTides[slackPosition + 1].indexnumber : currentMeasurements.length;
 
             const peakBeforeStart = previousSlackIndex + 1;
-            const peakBeforeEnd = Math.max(slackIndex - 1, peakBeforeStart);
+            const peakBeforeEnd = Math.max(slackTide.indexnumber - 1, peakBeforeStart);
             if (peakBeforeStart <= peakBeforeEnd) {
                 peakIndices.add(findNearestPeakBefore(peakBeforeStart, peakBeforeEnd));
             }
 
-            const peakAfterStart = slackIndex + 1;
+            const peakAfterStart = slackTide.indexnumber + 1;
             const peakAfterEnd = Math.min(nextSlackIndex - 1, currentMeasurements.length - 1);
             if (peakAfterStart <= peakAfterEnd) {
                 peakIndices.add(findNearestPeakAfter(peakAfterStart, peakAfterEnd));
             }
         });
 
-        currentMeasurements.forEach((measurement, index) => {
-            measurement.isPeak = peakIndices.has(index);
+        peakIndices.forEach((peakIndex) => {
+            currentMeasurements[peakIndex].isPeak = true;
         });
-
-        slackIndices.forEach((slackIndex) => {
-            currentMeasurements[slackIndex].isLowest = true;
+        
+        slackTides.forEach((slackTide) => {
+            currentMeasurements[slackTide.indexnumber].isLowest = true;
         });
 
         /**
@@ -1090,10 +1193,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         let maxDuration = 0; // Used for proportional scaling of timeline bars
         
         // Create a window for each slack tide
-        slackIndices.forEach((slackIndex, windowIndex) => {
+        slackTides.forEach((slackTide, windowIndex) => {
             // Find the peak before this slack tide
             let peakBeforeIndex = -1;
-            for (let i = slackIndex - 1; i >= 0; i--) {
+            for (let i = slackTide.indexnumber - 1; i >= 0; i--) {
                 if (currentMeasurements[i].isPeak) {
                     peakBeforeIndex = i;
                     break;
@@ -1102,7 +1205,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             
             // Find the peak after this slack tide
             let peakAfterIndex = -1;
-            for (let i = slackIndex + 1; i < currentMeasurements.length; i++) {
+            for (let i = slackTide.indexnumber + 1; i < currentMeasurements.length; i++) {
                 if (currentMeasurements[i].isPeak) {
                     peakAfterIndex = i;
                     break;
@@ -1135,10 +1238,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             windows.push({
                 windowStart,
                 windowEnd,
-                slackTime: currentMeasurements[slackIndex],
-                slackIndex: slackIndex,
+                slackTime: currentMeasurements[slackTide.indexnumber],
+                slackIndex: slackTide.indexnumber,
                 duration,
-                tideIndicator: getTideIndicator(slackIndex),
+                tideIndicator: getTideIndicator(slackTide.indexnumber),
                 windowStartIndex,
                 windowEndIndex,
                 measurements: windowMeasurements
