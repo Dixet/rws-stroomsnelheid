@@ -694,8 +694,8 @@ async function fetchData() {
     // Use the RWS API to fetch data for the selected dive site and time range
     // Note: The observationTypeId and sourceName are hardcoded based on the API documentation 
     // url is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
-    const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?locationCode=${encodeURIComponent(diveSite)}&observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
-    const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&locationCode=${encodeURIComponent(diveSite)}`;
+    const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
+    const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
 
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
