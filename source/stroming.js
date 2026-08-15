@@ -693,17 +693,19 @@ async function fetchData() {
 
     // Use the RWS API to fetch data for the selected dive site and time range
     // Note: The observationTypeId and sourceName are hardcoded based on the API documentation 
-    // url is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
-    const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
-    const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
-
+    // url_speed is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
+    const url_speed = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
+    const url_direction = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
+    // hoogte is niet van alle stekken bekend, dus die halen we op voor de zeelandbrug. De exacte waterhoogte van de stek is niet zo relevant, maar we willen wel weten of het waterpeil hoog of laag is. Daarom halen we de hoogte op van de zeelandbrug en gebruiken die als referentie.
+    const url_hoogte = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=WT&sourceName=S_4&&locationCode=zn&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
-        let response, response_w;
+        let response_speed, response_direction, response_hoogte;
         try {
-            response = await fetch(url);
-            response_w = await fetch(url_w);
+            response_speed = await fetch(url_speed);
+            response_direction = await fetch(url_direction);
+            response_hoogte = await fetch(url_hoogte);
         } catch (fetchError) {
             // Network-level errors (CORS, DNS, etc.) - these don't return a response object
             throw new Error(`Netwerkfout: ${fetchError.message}`);
@@ -711,18 +713,20 @@ async function fetchData() {
         
         // Check both responses for errors
         let errorMessage = null;
-        if (!response.ok || !response_w.ok) {
-            const speedError = !response.ok ? `Stroomsnelheid API: HTTP ${response.status} ${response.statusText || ''}` : null;
-            const directionError = !response_w.ok ? `Stromingsrichting API: HTTP ${response_w.status} ${response_w.statusText || ''}` : null;
-            errorMessage = [speedError, directionError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
+        if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
+            const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
+            const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
+            const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
+            errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
             throw new Error(errorMessage);
         }
         
-        const data = await response.json();
-        const data_w = await response_w.json();
+        const data_speed = await response_speed.json();
+        const data_direction = await response_direction.json();
+        const data_hoogte = await response_hoogte.json();
         
         // Process and display the fetched data
-        displayResults(data, data_w, diveSiteName, moonphases);
+        displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
         
         // Scroll to dive windows section after displaying results (especially useful on mobile)
         setTimeout(() => {
@@ -750,20 +754,22 @@ async function fetchData() {
 /**
  * Main function to process and display water current data in both timeline and tabular formats.
  * Creates dive windows visualization showing optimal diving periods and detailed current information.
- * @param {Object} data - Speed data from RWS API containing current measurements in m/s
- * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
+ * @param {Object} data_speed - Speed data from RWS API containing current measurements in m/s
+ * @param {Object} data_direction - Direction data from RWS API containing current direction in degrees
+ * @param {Object} data_hoogte - Water height data from RWS API
  * @param {Object} moonphases - Moon phase data for the time period
  */
-function displayResults(data ,data_w, diveSiteName, moonphases) {
+function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases) {
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
     const legend = document.querySelector('.legend');
 
     // Verify that we have valid data before proceeding
-    if (data.results && data.results.length > 0) {
+    if (data_speed.results && data_speed.results.length > 0) {
         // Combine speed and direction data into a single array for easier processing
-        const speedEvents = data.results[0].events;
-        const directionEvents = data_w.results[0].events;
+        const speedEvents = data_speed.results[0].events;
+        const directionEvents = data_direction.results[0].events;
+        const hoogteEvents = data_hoogte.results[0].events;
 
         // Map direction values by timestamp for robust timestamp alignment
         const directionByTimestamp = new Map(
@@ -772,16 +778,28 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 .map(evt => [evt.timeStamp, parseFloat(evt.value)])
         );
 
+        // Map hoogte values by timestamp for robust timestamp alignment
+        const hoogteByTimestamp = new Map(
+            hoogteEvents
+                .filter(evt => evt && evt.timeStamp)
+                .map(evt => [evt.timeStamp, parseFloat(evt.value)])
+        );
+
         // Create combined measurements array with speed and direction data, filtering out invalid entries
         const currentMeasurements = speedEvents
             .map((speedEvent) => {
                 const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
+                const hoogteValue = hoogteByTimestamp.get(speedEvent.timeStamp);
                 return {
                     timeStamp: speedEvent.timeStamp,
                     speed: parseFloat(speedEvent.value), // Current speed in m/s
                     direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
                         ? directionValue
                         : null,
+                    hoogte_zb: typeof hoogteValue === 'number' && !Number.isNaN(hoogteValue)
+                        ? hoogteValue
+                        : null,
+                    tideIndicator: hoogteValue < 0 ? 'LW' : 'HW', // Simple tide indicator based on water height
                     isLowest: false, // Will be set during slack time calculation
                     isPeak: false, // Will be set during peak current calculation
                     isLocalLow: false, // Will be set during slack time calculation
@@ -797,7 +815,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 measurement.speed !== undefined &&
                 measurement.direction !== null &&
                 measurement.direction !== undefined &&
-                !Number.isNaN(measurement.direction)
+                !Number.isNaN(measurement.direction) &&
+                measurement.hoogte_zb !== null &&
+                measurement.hoogte_zb !== undefined
             )
             .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
@@ -1121,27 +1141,6 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         slackTides.forEach((slackTide) => {
             currentMeasurements[slackTide.indexnumber].isLowest = true;
         });
-
-        /**
-         * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
-         * @param {number} slackIndex - Index of slack time in events array
-         * @returns {string} - 'LW', 'HW', or empty string
-         */
-        const getTideIndicator = (slackIndex) => {
-            // Get direction before and after the slack time to determine tide type
-            const beforeDirection = slackIndex > 0 ? 
-                currentMeasurements[slackIndex - 1].direction : 
-                currentMeasurements[slackIndex].direction;
-            const afterDirection = slackIndex < currentMeasurements.length - 1 ? 
-                currentMeasurements[slackIndex + 1].direction : 
-                currentMeasurements[slackIndex].direction;
-            
-            // Determine tide type based on direction change pattern
-            if (beforeDirection > 180 && afterDirection < 180) return 'LW';
-            if (beforeDirection < 180 && afterDirection > 180) return 'HW';
-            return '';
-        };
-
         // Add header for dive windows section
         const diveWindowsHeader = document.createElement('h2');
         diveWindowsHeader.textContent = `Duikvensters - ${diveSiteName}`;
@@ -1241,7 +1240,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 slackTime: currentMeasurements[slackTide.indexnumber],
                 slackIndex: slackTide.indexnumber,
                 duration,
-                tideIndicator: getTideIndicator(slackTide.indexnumber),
+                tideIndicator: currentMeasurements[slackTide.indexnumber].tideIndicator,
                 windowStartIndex,
                 windowEndIndex,
                 measurements: windowMeasurements
