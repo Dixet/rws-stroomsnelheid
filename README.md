@@ -51,15 +51,22 @@ De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke 
 - **Einddatum / Eindtijd**
 	- Betekenis: einde van de periode.
 	- Gebruik: kies een tijd na het startmoment (de pagina voorkomt een eindtijd vóór starttijd).
-- **Toon stroming**
+- **Toon duikvensters**
 	- Betekenis: haalt de gegevens op en toont resultaten.
 	- Gebruik: klik nadat locatie en periode zijn ingevuld.
+### 2) Legenda
+<img width="500" alt="legenda" src="https://github.com/user-attachments/assets/e530f21e-ce42-412c-b3c1-f46176c64203" />
+De stroomsnelheid wordt in kleurgradaties weergegeven van rood (duiken afgeraden) tot groen (lichte stroming). 
+Daarnaast wordt een icoon getoond voor de maanfasen, en de daaropvolgende spring- of doodtij. 
 
 ### 2) Duikvensters
-<img width="869" height="500" alt="Screenshot 2026-03-03 132503" src="https://github.com/user-attachments/assets/77056136-0eae-4d5d-b394-7fa2f11f1f0b" />
+<img width="1929" height="601" alt="image" src="https://github.com/user-attachments/assets/66cfbef4-6345-47f7-b311-72fe59bac677" />
 
 In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten binnen de gekozen periode.
 
+- **Datumscheiding**
+	- Betekenis: toont de datum waarop het duikvenster valt (gemeten voor het moment van kentering)
+ 	- Lezen: naast de datum wordt indien van toepassing de maanfase of spring- of doodtij icoon getoond 
 - **Tijdlijnen per dag/per venster**
 	- Betekenis: laten zien hoe de stroming in de tijd verandert.
 	- Lezen: Iedere balk toont een venster van piekstroming tot piekstroming, met kleur- en tijdsmarkeringen voor verschillende stroomsnelheden tussen die pieken
@@ -69,11 +76,20 @@ In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten bin
 - **Tijdlabels en markeringen**
 	- Betekenis: tonen belangrijke omslagpunten in de stroming.
 	- Lezen: gebruik deze tijden om je duikplanning (te water, omkeren, uit water) beter te timen.
-- **Legenda**
-	- Betekenis: uitleg van alle gebruikte kleuren.
-	- Lezen: gebruik de legenda altijd als referentie bij interpretatie.
 
-### 3) Stromingsdetails
+### 3) Detailvenster
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/12d26e55-4c8f-4b2d-8f58-d79c41926ae1" />
+
+Wanneer geklikt wordt op het vergrootglas 🔍 of op het duikvenster opent een detailscherm met:
+- **Detailinformatie**
+    - Lengte en start- en eindtijd van de duikvensters
+    - Getij-extreem en tijdstip van de stromingskentering
+- **Grafiek**
+    - Grafiek met daarin de stroomsnelheid (y-as) op ieder tijdstip (x-as)
+    - Boven de grafiek wordt op ieder tijdstip de stromingsrichting aangegeven met een windrichtingspijl (↑ = noord)
+    - Aanwijzer voor het tijdstip van de kentering 
+
+### 4) Stromingsdetails
 <img width="1288" height="841" alt="Screenshot 2026-03-03 140321" src="https://github.com/user-attachments/assets/f8163199-5f45-4c80-94fd-c2cc6fbe853b" />
 
 Dit onderdeel geeft de gedetailleerde metingen in tabelvorm.
@@ -96,7 +112,6 @@ Dit onderdeel geeft de gedetailleerde metingen in tabelvorm.
 	- Lezen: gebruik kleur als snelle indicatie, en controleer daarna de exacte cijfers.
 
 ## Beperkingen
-
 - Deze pagina is een hulpmiddel en geen veiligheidsgarantie.
 - Beschikbaarheid en juistheid hangen af van externe bronnen (Rijkswaterstaat en kaartdiensten).
 - Er kan vertraging of tijdelijke uitval zijn in aangeleverde data.
