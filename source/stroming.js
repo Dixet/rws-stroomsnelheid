@@ -806,6 +806,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                     isLocalPeak: false, // Will be set during peak current calculation
                     signed: null, // Will be set during mean direction calculation
                     signChange: false, // Will be set during sign change detection
+                    isDirectionChange: false, // Will be set during direction change detection
                     index: null // Will be set during iteration for local peak/low detection
                 };
             })
@@ -874,18 +875,17 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
-        const normalizeDirection = (direction) => {
-            if (typeof direction !== 'number' || Number.isNaN(direction)) {
-                return direction;
-            }
-            return ((direction % 360) + 360) % 360;
-        };
+        const calculateAngle = (dir1, dir2) => {
+        
+            clockwiseDiff = (dir2 - dir1 + 360) % 360;
+            counterClockwiseDiff = (dir1 - dir2 + 360) % 360;
+            return Math.min(clockwiseDiff, counterClockwiseDiff);
+        }
+
 
         const isDirectionChange = (dir1, dir2) => {
-            const a = normalizeDirection(dir1);
-            const b = normalizeDirection(dir2);
-            const diff = Math.abs(a - b);
-            return diff >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+            const angle = calculateAngle(dir1, dir2);
+            return angle >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
         };
 
         const isSignChange = (value, beforevalue, aftervalue) => {
@@ -1026,11 +1026,12 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             measurement.signChange = signChange;
             measurement.isLocalPeak = isLocalPeak(index);
             measurement.isLocalLow = isLocalMinimum(index);
+            measurement.isDirectionChange = nextMeasurement && previousMeasurement ? isDirectionChange(previousMeasurement.direction, nextMeasurement.direction) : false;
             measurement.indexnumber = index;
         });
 
         const slackTideCandidates = currentMeasurements.filter((measurement) => {
-            return measurement.isLocalLow && measurement.signChange;
+            return measurement.isLocalLow && measurement.isDirectionChange ;
         }); 
 
         /**
