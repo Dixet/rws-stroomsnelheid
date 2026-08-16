@@ -633,7 +633,8 @@ function getWindDirection(degrees) {
     // Convert degrees to 8-point compass index using mathematical division
     // Each compass point covers 45 degrees (360/8 = 45)
     const directions = ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"];
-    return directions[Math.round(degrees / 45) % 8];
+    const directionArrows = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+    return { direction: directions[Math.round(degrees / 45) % 8], arrow: directionArrows[Math.round(degrees / 45) % 8] };
 }
 
 /**
@@ -693,17 +694,19 @@ async function fetchData() {
 
     // Use the RWS API to fetch data for the selected dive site and time range
     // Note: The observationTypeId and sourceName are hardcoded based on the API documentation 
-    // url is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
-    const url = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
-    const url_w = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
-
+    // url_speed is the URL to fetch the water speed data, and url_w is the URL to fetch the water direction data
+    const url_speed = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG_SOF_6.1.ms&sourceName=compute&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}&&`;
+    const url_direction = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=SG.2&sourceName=SOF_6&&locationCode=${encodeURIComponent(diveSite)}&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
+    // hoogte is niet van alle stekken bekend, dus die halen we op voor de zeelandbrug. De exacte waterhoogte van de stek is niet zo relevant, maar we willen wel weten of het waterpeil hoog of laag is. Daarom halen we de hoogte op van de zeelandbrug en gebruiken die als referentie.
+    const url_hoogte = `https://rwsos.rws.nl/wb-api/dd/2.0/timeseries?observationTypeId=WT&sourceName=S_4&&locationCode=zn&&startTime=${encodeURIComponent(StartDateISO)}&endTime=${encodeURIComponent(EndDateISO)}`;
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
-        let response, response_w;
+        let response_speed, response_direction, response_hoogte;
         try {
-            response = await fetch(url);
-            response_w = await fetch(url_w);
+            response_speed = await fetch(url_speed);
+            response_direction = await fetch(url_direction);
+            response_hoogte = await fetch(url_hoogte);
         } catch (fetchError) {
             // Network-level errors (CORS, DNS, etc.) - these don't return a response object
             throw new Error(`Netwerkfout: ${fetchError.message}`);
@@ -711,18 +714,20 @@ async function fetchData() {
         
         // Check both responses for errors
         let errorMessage = null;
-        if (!response.ok || !response_w.ok) {
-            const speedError = !response.ok ? `Stroomsnelheid API: HTTP ${response.status} ${response.statusText || ''}` : null;
-            const directionError = !response_w.ok ? `Stromingsrichting API: HTTP ${response_w.status} ${response_w.statusText || ''}` : null;
-            errorMessage = [speedError, directionError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
+        if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
+            const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
+            const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
+            const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
+            errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
             throw new Error(errorMessage);
         }
         
-        const data = await response.json();
-        const data_w = await response_w.json();
+        const data_speed = await response_speed.json();
+        const data_direction = await response_direction.json();
+        const data_hoogte = await response_hoogte.json();
         
         // Process and display the fetched data
-        displayResults(data, data_w, diveSiteName, moonphases);
+        displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
         
         // Scroll to dive windows section after displaying results (especially useful on mobile)
         setTimeout(() => {
@@ -750,20 +755,22 @@ async function fetchData() {
 /**
  * Main function to process and display water current data in both timeline and tabular formats.
  * Creates dive windows visualization showing optimal diving periods and detailed current information.
- * @param {Object} data - Speed data from RWS API containing current measurements in m/s
- * @param {Object} data_w - Direction data from RWS API containing current direction in degrees
+ * @param {Object} data_speed - Speed data from RWS API containing current measurements in m/s
+ * @param {Object} data_direction - Direction data from RWS API containing current direction in degrees
+ * @param {Object} data_hoogte - Water height data from RWS API
  * @param {Object} moonphases - Moon phase data for the time period
  */
-function displayResults(data ,data_w, diveSiteName, moonphases) {
+function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases) {
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
     const legend = document.querySelector('.legend');
 
     // Verify that we have valid data before proceeding
-    if (data.results && data.results.length > 0) {
+    if (data_speed.results && data_speed.results.length > 0) {
         // Combine speed and direction data into a single array for easier processing
-        const speedEvents = data.results[0].events;
-        const directionEvents = data_w.results[0].events;
+        const speedEvents = data_speed.results[0].events;
+        const directionEvents = data_direction.results[0].events;
+        const hoogteEvents = data_hoogte.results[0].events;
 
         // Map direction values by timestamp for robust timestamp alignment
         const directionByTimestamp = new Map(
@@ -772,18 +779,36 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 .map(evt => [evt.timeStamp, parseFloat(evt.value)])
         );
 
+        // Map hoogte values by timestamp for robust timestamp alignment
+        const hoogteByTimestamp = new Map(
+            hoogteEvents
+                .filter(evt => evt && evt.timeStamp)
+                .map(evt => [evt.timeStamp, parseFloat(evt.value)])
+        );
+
         // Create combined measurements array with speed and direction data, filtering out invalid entries
         const currentMeasurements = speedEvents
             .map((speedEvent) => {
                 const directionValue = directionByTimestamp.get(speedEvent.timeStamp);
+                const hoogteValue = hoogteByTimestamp.get(speedEvent.timeStamp);
                 return {
                     timeStamp: speedEvent.timeStamp,
                     speed: parseFloat(speedEvent.value), // Current speed in m/s
                     direction: typeof directionValue === 'number' && !Number.isNaN(directionValue)
                         ? directionValue
                         : null,
+                    hoogte_zb: typeof hoogteValue === 'number' && !Number.isNaN(hoogteValue)
+                        ? hoogteValue
+                        : null,
+                    tideIndicator: hoogteValue < 0 ? 'LW' : 'HW', // Simple tide indicator based on water height
                     isLowest: false, // Will be set during slack time calculation
-                    isPeak: false // Will be set during peak current calculation
+                    isPeak: false, // Will be set during peak current calculation
+                    isLocalLow: false, // Will be set during slack time calculation
+                    isLocalPeak: false, // Will be set during peak current calculation
+                    signed: null, // Will be set during mean direction calculation
+                    signChange: false, // Will be set during sign change detection
+                    isDirectionChange: false, // Will be set during direction change detection
+                    index: null // Will be set during iteration for local peak/low detection
                 };
             })
             .filter(measurement => 
@@ -792,7 +817,9 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 measurement.speed !== undefined &&
                 measurement.direction !== null &&
                 measurement.direction !== undefined &&
-                !Number.isNaN(measurement.direction)
+                !Number.isNaN(measurement.direction) &&
+                measurement.hoogte_zb !== null &&
+                measurement.hoogte_zb !== undefined
             )
             .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
@@ -849,18 +876,53 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
 
         const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
-        const normalizeDirection = (direction) => {
-            if (typeof direction !== 'number' || Number.isNaN(direction)) {
-                return direction;
-            }
-            return ((direction % 360) + 360) % 360;
-        };
+        const calculateAngle = (dir1, dir2) => {
+        
+            clockwiseDiff = (dir2 - dir1 + 360) % 360;
+            counterClockwiseDiff = (dir1 - dir2 + 360) % 360;
+            return Math.min(clockwiseDiff, counterClockwiseDiff);
+        }
+
 
         const isDirectionChange = (dir1, dir2) => {
-            const a = normalizeDirection(dir1);
-            const b = normalizeDirection(dir2);
-            const diff = Math.abs(a - b);
-            return diff >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+            const angle = calculateAngle(dir1, dir2);
+            return angle >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
+        };
+
+        const isSignChange = (value, beforevalue, aftervalue) => {
+            if (typeof value !== 'number' || typeof beforevalue !== 'number' || typeof aftervalue !== 'number') {
+                return false;
+            }
+            return (value < 0 && beforevalue >= 0) || (value >= 0 && beforevalue < 0) || (value < 0 && aftervalue >= 0) || (value >= 0 && aftervalue < 0); 
+        };
+
+        const toRadians = (degrees) => degrees * (Math.PI / 180);
+        const toDegrees = (radians) => radians * (180 / Math.PI);
+
+        const calculateTheta0  = (measurements) => {
+            // filter low speed measurements to avoid noise in theta0 calculation
+            const lowSpeedThreshold = 0.1; // m/s
+            const filteredMeasurements = measurements.filter(entry => entry.speed > lowSpeedThreshold);
+
+            if (filteredMeasurements.length === 0) {
+                return null; // No valid measurements to calculate theta0
+            } else {
+                const sumCos = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.cos(toRadians(entry.direction * 2))), 0);
+                const sumSin = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.sin(toRadians(entry.direction * 2))), 0);
+                const meanDirectionRad = Math.atan2(sumSin, sumCos);
+                const meanDirectionDeg = toDegrees(meanDirectionRad);
+                const theta0 = ((meanDirectionDeg /2 ) % 360); 
+                return Math.abs(theta0);
+            }
+
+        };
+
+        const calculateSigned = (snelheid, richting, theta0) => {
+            if (typeof snelheid !== 'number' || typeof richting !== 'number' || typeof theta0 !== 'number') {
+                return null;
+            }
+            const signedSpeed = snelheid * Math.cos(toRadians(richting - theta0));
+            return signedSpeed;
         };
 
         const isLocalPeak = (index) => {
@@ -949,96 +1011,138 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
                 (speed < prevSpeed - FLOAT_TOLERANCE || speed < nextSpeed - FLOAT_TOLERANCE);
         };
 
-        const slackIndicesSet = new Set();
-        currentMeasurements.forEach((measurement, index) => {
+
+        // add helpers to the measurements for later use
+        const theta0 = calculateTheta0(currentMeasurements);
+        currentMeasurements.forEach((measurement,index) => {
             if (index >= currentMeasurements.length - 1) {
                 return;
             }
 
             const nextMeasurement = currentMeasurements[index + 1];
-            if (isDirectionChange(measurement.direction, nextMeasurement.direction)) {
-                const slackIndex = measurement.speed <= nextMeasurement.speed ? index : index + 1;
-                slackIndicesSet.add(slackIndex);
-            }
+            const previousMeasurement = index > 0 ? currentMeasurements[index - 1] : null;
+            measurement.signed = calculateSigned(measurement.speed, measurement.direction, theta0);
+
+            const signChange = previousMeasurement ? isSignChange(measurement.signed, previousMeasurement.signed, calculateSigned(nextMeasurement.speed, nextMeasurement.direction, theta0)) : false;
+            measurement.signChange = signChange;
+            measurement.isLocalPeak = isLocalPeak(index);
+            measurement.isLocalLow = isLocalMinimum(index);
+            measurement.isDirectionChange = nextMeasurement && previousMeasurement ? isDirectionChange(previousMeasurement.direction, nextMeasurement.direction) : false;
+            measurement.indexnumber = index;
         });
 
-        currentMeasurements.forEach((measurement, index) => {
-            if (index > 0 && index < currentMeasurements.length - 1) {
-                const prevMeasurement = currentMeasurements[index - 1];
-                const nextMeasurement = currentMeasurements[index + 1];
-                if (isDirectionChange(prevMeasurement.direction, nextMeasurement.direction) && isLocalMinimum(index)) {
-                    slackIndicesSet.add(index);
+        const slackTideCandidates = currentMeasurements.filter((measurement) => {
+            return measurement.isLocalLow && measurement.isDirectionChange ;
+        }); 
+
+        /**
+         * Filtert valse kentering-kandidaten (door "klotsen") uit een lijst van
+         * signChange-kandidaten. Kandidaten die kort na elkaar vallen (binnen
+         * clusterWindowMs) worden als één cluster gezien; per cluster wordt alleen
+         * de kandidaat met de laagste snelheid (dichtst bij echte stilstand)
+         * behouden. Bij gelijke snelheid wint de eerste (vroegste) kandidaat.
+         *
+         * @param {Array} candidates - lijst van kentering-kandidaten, elk met
+         *   minimaal { timeStamp: string (ISO), speed: number }.
+         *   Moet al gesorteerd zijn op timeStamp oplopend.
+         * @param {number} clusterWindowMs - max tijd tussen opeenvolgende
+         *   kandidaten om nog tot hetzelfde cluster te horen (default 2 uur).
+         * @returns {Array} gefilterde lijst met alleen de "echte" kenteringen,
+         *   in dezelfde volgorde als de input.
+         */
+        const filterSlackTideCandidates = (candidates) => {
+            if (!candidates || candidates.length === 0) return [];
+
+            const clusterWindowMs = 2 * 60 * 60 * 1000 // 2 uur in milliseconden
+
+            // Zorg dat we op tijd sorteren, voor het geval de input dat nog niet is
+            const sorted = [...candidates].sort(
+                (a, b) => new Date(a.timeStamp) - new Date(b.timeStamp)
+            );
+
+            // Stap 1: groepeer opeenvolgende kandidaten in clusters
+            // ("chained clustering": zolang het gat met de vórige kandidaat
+            // binnen het venster valt, blijft het dezelfde cluster)
+            const clusters = [];
+            let currentCluster = [sorted[0]];
+
+            for (let i = 1; i < sorted.length; i++) {
+                const prevTime = new Date(sorted[i - 1].timeStamp).getTime();
+                const currTime = new Date(sorted[i].timeStamp).getTime();
+
+                if (currTime - prevTime <= clusterWindowMs) {
+                    currentCluster.push(sorted[i]);
+                } else {
+                    clusters.push(currentCluster);
+                    currentCluster = [sorted[i]];
                 }
             }
-        });
+            clusters.push(currentCluster);
 
-        const dedupeSlackIndices = (indices) => {
-            const deduped = [];
-            indices.forEach((index) => {
-                if (deduped.length === 0) {
-                    deduped.push(index);
-                    return;
+            // Stap 2: kies per cluster de kandidaat met de laagste snelheid
+            // (dichtst bij echte stilstand); bij gelijkspel de eerste (vroegste)
+            const winners = clusters.map((cluster) => {
+                let best = cluster                                                                      [0];
+                for (let i = 1; i < cluster.length; i++) {
+                    if (cluster[i].speed < best.speed) {
+                        best = cluster[i];
+                    }
+                    // bij gelijke snelheid: best blijft de eerder gevonden
+                    // (= eerdere) kandidaat, dus geen actie nodig
                 }
-                const previousIndex = deduped[deduped.length - 1];
-                if (
-                    index === previousIndex + 1 &&
-                    approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
-                ) {
-                    return;
-                }
-                deduped.push(index);
+                return best;
             });
-            return deduped;
-        };
 
-        const slackIndices = dedupeSlackIndices(Array.from(slackIndicesSet).sort((a, b) => a - b));
+            return winners;
+        }
+
+        // const dedupeSlackIndices = (indices) => {
+        //     const deduped = [];
+        //     indices.forEach((index) => {
+        //         if (deduped.length === 0) {
+        //             deduped.push(index);
+        //             return;
+        //         }
+        //         const previousIndex = deduped[deduped.length - 1];
+        //         if (
+        //             index === previousIndex + 1 &&
+        //             approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
+        //         ) {
+        //             return;
+        //         }
+        //         deduped.push(index);
+        //     });
+        //     return deduped;
+        // };
+
+        //const slackIndices = dedupeSlackIndices(Array.from(slackIndicesCandidates).sort((a, b) => a - b));
+        const slackTides = filterSlackTideCandidates(Array.from(slackTideCandidates).sort((a, b) => a - b));
 
         const peakIndices = new Set();
-        slackIndices.forEach((slackIndex, slackPosition) => {
-            const previousSlackIndex = slackPosition > 0 ? slackIndices[slackPosition - 1] : -1;
-            const nextSlackIndex = slackPosition < slackIndices.length - 1 ? slackIndices[slackPosition + 1] : currentMeasurements.length;
+        slackTides.forEach((slackTide, slackPosition) => {
+            const previousSlackIndex = slackPosition > 0 ? slackTides[slackPosition - 1].indexnumber : -1;
+            const nextSlackIndex = slackPosition < slackTides.length - 1 ? slackTides[slackPosition + 1].indexnumber : currentMeasurements.length;
 
             const peakBeforeStart = previousSlackIndex + 1;
-            const peakBeforeEnd = Math.max(slackIndex - 1, peakBeforeStart);
+            const peakBeforeEnd = Math.max(slackTide.indexnumber - 1, peakBeforeStart);
             if (peakBeforeStart <= peakBeforeEnd) {
                 peakIndices.add(findNearestPeakBefore(peakBeforeStart, peakBeforeEnd));
             }
 
-            const peakAfterStart = slackIndex + 1;
+            const peakAfterStart = slackTide.indexnumber + 1;
             const peakAfterEnd = Math.min(nextSlackIndex - 1, currentMeasurements.length - 1);
             if (peakAfterStart <= peakAfterEnd) {
                 peakIndices.add(findNearestPeakAfter(peakAfterStart, peakAfterEnd));
             }
         });
 
-        currentMeasurements.forEach((measurement, index) => {
-            measurement.isPeak = peakIndices.has(index);
+        peakIndices.forEach((peakIndex) => {
+            currentMeasurements[peakIndex].isPeak = true;
         });
-
-        slackIndices.forEach((slackIndex) => {
-            currentMeasurements[slackIndex].isLowest = true;
+        
+        slackTides.forEach((slackTide) => {
+            currentMeasurements[slackTide.indexnumber].isLowest = true;
         });
-
-        /**
-         * Determine tide indicator (LW=Low Water, HW=High Water) based on direction change
-         * @param {number} slackIndex - Index of slack time in events array
-         * @returns {string} - 'LW', 'HW', or empty string
-         */
-        const getTideIndicator = (slackIndex) => {
-            // Get direction before and after the slack time to determine tide type
-            const beforeDirection = slackIndex > 0 ? 
-                currentMeasurements[slackIndex - 1].direction : 
-                currentMeasurements[slackIndex].direction;
-            const afterDirection = slackIndex < currentMeasurements.length - 1 ? 
-                currentMeasurements[slackIndex + 1].direction : 
-                currentMeasurements[slackIndex].direction;
-            
-            // Determine tide type based on direction change pattern
-            if (beforeDirection > 180 && afterDirection < 180) return 'LW';
-            if (beforeDirection < 180 && afterDirection > 180) return 'HW';
-            return '';
-        };
-
         // Add header for dive windows section
         const diveWindowsHeader = document.createElement('h2');
         diveWindowsHeader.textContent = `Duikvensters - ${diveSiteName}`;
@@ -1090,10 +1194,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
         let maxDuration = 0; // Used for proportional scaling of timeline bars
         
         // Create a window for each slack tide
-        slackIndices.forEach((slackIndex, windowIndex) => {
+        slackTides.forEach((slackTide, windowIndex) => {
             // Find the peak before this slack tide
             let peakBeforeIndex = -1;
-            for (let i = slackIndex - 1; i >= 0; i--) {
+            for (let i = slackTide.indexnumber - 1; i >= 0; i--) {
                 if (currentMeasurements[i].isPeak) {
                     peakBeforeIndex = i;
                     break;
@@ -1102,7 +1206,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             
             // Find the peak after this slack tide
             let peakAfterIndex = -1;
-            for (let i = slackIndex + 1; i < currentMeasurements.length; i++) {
+            for (let i = slackTide.indexnumber + 1; i < currentMeasurements.length; i++) {
                 if (currentMeasurements[i].isPeak) {
                     peakAfterIndex = i;
                     break;
@@ -1135,10 +1239,10 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             windows.push({
                 windowStart,
                 windowEnd,
-                slackTime: currentMeasurements[slackIndex],
-                slackIndex: slackIndex,
+                slackTime: currentMeasurements[slackTide.indexnumber],
+                slackIndex: slackTide.indexnumber,
                 duration,
-                tideIndicator: getTideIndicator(slackIndex),
+                tideIndicator: currentMeasurements[slackTide.indexnumber].tideIndicator,
                 windowStartIndex,
                 windowEndIndex,
                 measurements: windowMeasurements
@@ -1614,7 +1718,7 @@ function displayResults(data ,data_w, diveSiteName, moonphases) {
             dateCell.textContent = formatDate(measurement.timeStamp);
             timeCell.textContent = formatTime(measurement.timeStamp);
             valueCell.textContent = Math.round(measurement.speed * 100); // Convert m/s to cm/s and round
-            directionCell.textContent = measurement.direction + " (" + getWindDirection(measurement.direction) + ")";
+            directionCell.textContent = measurement.direction + " (" + getWindDirection(measurement.direction).direction + ")";
 
             // Apply color-coded background based on current strength and slack times
             if (measurement.isLowest) {
@@ -1930,6 +2034,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         const getBoundaryThreshold = (bandA, bandB) => {
             const pair = [bandA, bandB].sort().join('-');
             if (pair === 'high-medium') return 30;
+            if (pair === 'high-low') return 30;
             if (pair === 'low-medium') return 20;
             return null;
         };
@@ -1939,11 +2044,13 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         windowData.measurements.forEach((item, index) => {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
-            labels.push(formatTime(item.timeStamp));
+            // Use a combined label format to include both time and wind direction to show a time and direction label on the x-axis without cluttering the chart
+            labels.push(`${formatTime(item.timeStamp)} ${getWindDirection(item.direction).arrow}`);
             lowSpeed.push(band === 'low' ? value : null);
             mediumSpeed.push(band === 'medium' ? value : null);
             highSpeed.push(band === 'high' ? value : null);
 
+            // make sure there are no gaps in the chart when transitioning between bands by adding a point at the boundary threshold
             const nextItem = windowData.measurements[index + 1];
             if (nextItem) {
                 const nextValue = Math.round(nextItem.speed * 100);
@@ -1951,9 +2058,9 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 if (nextBand !== band) {
                     const threshold = getBoundaryThreshold(band, nextBand);
                     if (threshold !== null) {
-                        const boundaryLabel = `${formatTime(nextItem.timeStamp)}\u200B`;
+                        const boundaryLabel = `${formatTime(nextItem.timeStamp)} ${getWindDirection(nextItem.direction).arrow}`;
                         labels.push(boundaryLabel);
-                        lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : null);
+                        lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : (band === 'low' || nextBand === 'low') && threshold === 30 ? 30 : null);
                         mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
                         highSpeed.push((band === 'high' || nextBand === 'high') && threshold === 30 ? 30 : null);
                     }
@@ -1966,9 +2073,9 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         let slackTideTime = null;
         
         if (windowData.slackTime && windowData.slackTime.timeStamp) {
-            slackTideTime = formatTime(windowData.slackTime.timeStamp);
+            slackTideTime =  formatTime(windowData.slackTime.timeStamp);
             // Find the index of the slack tide measurement in the array
-            slackTideIndex = labels.indexOf(slackTideTime);
+            slackTideIndex = labels.indexOf(`${slackTideTime} ${getWindDirection(windowData.slackTime.direction).arrow}`);
         }
 
         new Chart(chartCanvas.getContext('2d'), {
@@ -1978,6 +2085,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 datasets: [
                     {
                         label: '≤ 20 cm/s',
+                        xAxisID: 'x',
                         data: lowSpeed,
                         backgroundColor: 'rgba(34, 197, 94, 0.75)',
                         borderColor: 'rgba(34, 197, 94, 0.9)',
@@ -1990,6 +2098,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                     },
                     {
                         label: '21-30 cm/s',
+                        xAxisID: 'x',
                         data: mediumSpeed,
                         backgroundColor: 'rgba(251, 191, 36, 0.75)',
                         borderColor: 'rgba(234, 115, 22, 0.9)',
@@ -2002,6 +2111,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                     },
                     {
                         label: '> 30 cm/s',
+                        xAxisID: 'x',
                         data: highSpeed,
                         backgroundColor: 'rgba(244, 63, 94, 0.75)',
                         borderColor: 'rgba(220, 38, 38, 0.9)',
@@ -2015,18 +2125,49 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 scales: {
+                    xAxis2: {
+                        axis: "x",
+                        type: "category",
+                        title: { display: true, text: 'Richting' },
+                        position: 'top',  
+                        offset: true,          // helps avoid overlap with the 'x' ticks row
+                        grid: {
+                            drawOnChartArea: false, // only want the grid lines for one axis to show up
+                        },
+                        ticks: {
+                            maxRotation: 0,
+                            minRotation: 0,
+                            callback: function(label) {
+                                let realLabel = this.getLabelForValue(label)
+
+                                var date = realLabel.split(" ")[0];
+                                var arrow = realLabel.split(" ")[1];
+                                return arrow;
+                            }
+                        }
+                    },
                     x: {
+                        axis: "x",
                         title: { display: true, text: 'Tijd' },
-                        grid: { display: false }
+                        grid: { display: false },
+                        ticks: {
+                            callback: function(label) {
+                                let realLabel = this.getLabelForValue(label)
+                                var date = realLabel.split(" ")[0];
+                                var arrow = realLabel.split(" ")[1];
+                                return date;
+                            }
+                        }
                     },
                     y: {
                         title: { display: true, text: 'Snelheid (cm/s)' },
                         beginAtZero: true
                     }
-                },
+
+                },                
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'top' },
                     tooltip: { mode: 'index', intersect: false },
@@ -2034,6 +2175,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                         annotations: {
                             slackTideCallout: {
                                 type: 'label',
+                                xScaleID: 'x',   // add this — tells the plugin which axis to resolve xValue against
                                 xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
                                 yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
                                 content: slackTideIndex !== -1 ? [`${slackPeakText} ${slackTideTime}`] : [],
