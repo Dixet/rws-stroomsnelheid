@@ -633,7 +633,8 @@ function getWindDirection(degrees) {
     // Convert degrees to 8-point compass index using mathematical division
     // Each compass point covers 45 degrees (360/8 = 45)
     const directions = ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"];
-    return directions[Math.round(degrees / 45) % 8];
+    const directionArrows = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+    return { direction: directions[Math.round(degrees / 45) % 8], arrow: directionArrows[Math.round(degrees / 45) % 8] };
 }
 
 /**
@@ -1717,7 +1718,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             dateCell.textContent = formatDate(measurement.timeStamp);
             timeCell.textContent = formatTime(measurement.timeStamp);
             valueCell.textContent = Math.round(measurement.speed * 100); // Convert m/s to cm/s and round
-            directionCell.textContent = measurement.direction + " (" + getWindDirection(measurement.direction) + ")";
+            directionCell.textContent = measurement.direction + " (" + getWindDirection(measurement.direction).direction + ")";
 
             // Apply color-coded background based on current strength and slack times
             if (measurement.isLowest) {
@@ -2042,7 +2043,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         windowData.measurements.forEach((item, index) => {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
-            labels.push(formatTime(item.timeStamp));
+            labels.push(`${formatTime(item.timeStamp)};${getWindDirection(item.direction).arrow}`);
             lowSpeed.push(band === 'low' ? value : null);
             mediumSpeed.push(band === 'medium' ? value : null);
             highSpeed.push(band === 'high' ? value : null);
@@ -2054,7 +2055,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 if (nextBand !== band) {
                     const threshold = getBoundaryThreshold(band, nextBand);
                     if (threshold !== null) {
-                        const boundaryLabel = `${formatTime(nextItem.timeStamp)}\u200B`;
+                        const boundaryLabel = `${formatTime(nextItem.timeStamp)};${getWindDirection(nextItem.direction).arrow}`;
                         labels.push(boundaryLabel);
                         lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : null);
                         mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
@@ -2069,9 +2070,9 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         let slackTideTime = null;
         
         if (windowData.slackTime && windowData.slackTime.timeStamp) {
-            slackTideTime = formatTime(windowData.slackTime.timeStamp);
+            slackTideTime =  formatTime(windowData.slackTime.timeStamp);
             // Find the index of the slack tide measurement in the array
-            slackTideIndex = labels.indexOf(slackTideTime);
+            slackTideIndex = labels.indexOf(`${slackTideTime};${getWindDirection(windowData.slackTime.direction).arrow}`);
         }
 
         new Chart(chartCanvas.getContext('2d'), {
@@ -2081,6 +2082,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 datasets: [
                     {
                         label: '≤ 20 cm/s',
+                        xAxisID: 'x',
                         data: lowSpeed,
                         backgroundColor: 'rgba(34, 197, 94, 0.75)',
                         borderColor: 'rgba(34, 197, 94, 0.9)',
@@ -2093,6 +2095,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                     },
                     {
                         label: '21-30 cm/s',
+                        xAxisID: 'x',
                         data: mediumSpeed,
                         backgroundColor: 'rgba(251, 191, 36, 0.75)',
                         borderColor: 'rgba(234, 115, 22, 0.9)',
@@ -2105,6 +2108,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                     },
                     {
                         label: '> 30 cm/s',
+                        xAxisID: 'x',
                         data: highSpeed,
                         backgroundColor: 'rgba(244, 63, 94, 0.75)',
                         borderColor: 'rgba(220, 38, 38, 0.9)',
@@ -2118,18 +2122,48 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 scales: {
+                    xAxis2: {
+                        axis: "x",
+                        type: "category",
+                        position: 'bottom',   // add this
+                        maxRotation: 0,
+                        minRotation: 0,
+                        offset: true,          // helps avoid overlap with the 'x' ticks row
+                        grid: {
+                            drawOnChartArea: false, // only want the grid lines for one axis to show up
+                            },
+                            ticks: {
+                            callback: function(label) {
+                                let realLabel = this.getLabelForValue(label)
+
+                                var date = realLabel.split(";")[0];
+                                var arrow = realLabel.split(";")[1];
+                                return arrow;
+                            }
+                        }
+                    },
                     x: {
+                        axis: "x",
                         title: { display: true, text: 'Tijd' },
-                        grid: { display: false }
+                        grid: { display: false },
+                        ticks: {
+                            callback: function(label) {
+                                let realLabel = this.getLabelForValue(label)
+                                var date = realLabel.split(";")[0];
+                                var arrow = realLabel.split(";")[1];
+                                return date;
+                            }
+                        }
                     },
                     y: {
                         title: { display: true, text: 'Snelheid (cm/s)' },
                         beginAtZero: true
                     }
-                },
+
+                },                
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'top' },
                     tooltip: { mode: 'index', intersect: false },
@@ -2137,6 +2171,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                         annotations: {
                             slackTideCallout: {
                                 type: 'label',
+                                xScaleID: 'x',   // add this — tells the plugin which axis to resolve xValue against
                                 xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
                                 yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
                                 content: slackTideIndex !== -1 ? [`${slackPeakText} ${slackTideTime}`] : [],
