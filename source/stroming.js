@@ -2045,7 +2045,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
             // Use a combined label format to include both time and wind direction to show a time and direction label on the x-axis without cluttering the chart
-            labels.push(`${formatTime(item.timeStamp)};${getWindDirection(item.direction).arrow}`);
+            labels.push(`${formatTime(item.timeStamp)} ${getWindDirection(item.direction).arrow}`);
             lowSpeed.push(band === 'low' ? value : null);
             mediumSpeed.push(band === 'medium' ? value : null);
             highSpeed.push(band === 'high' ? value : null);
@@ -2058,7 +2058,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 if (nextBand !== band) {
                     const threshold = getBoundaryThreshold(band, nextBand);
                     if (threshold !== null) {
-                        const boundaryLabel = `${formatTime(nextItem.timeStamp)};${getWindDirection(nextItem.direction).arrow}`;
+                        const boundaryLabel = `${formatTime(nextItem.timeStamp)} ${getWindDirection(nextItem.direction).arrow}`;
                         labels.push(boundaryLabel);
                         lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : (band === 'low' || nextBand === 'low') && threshold === 30 ? 30 : null);
                         mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
@@ -2075,7 +2075,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         if (windowData.slackTime && windowData.slackTime.timeStamp) {
             slackTideTime =  formatTime(windowData.slackTime.timeStamp);
             // Find the index of the slack tide measurement in the array
-            slackTideIndex = labels.indexOf(`${slackTideTime};${getWindDirection(windowData.slackTime.direction).arrow}`);
+            slackTideIndex = labels.indexOf(`${slackTideTime} ${getWindDirection(windowData.slackTime.direction).arrow}`);
         }
 
         new Chart(chartCanvas.getContext('2d'), {
@@ -2129,19 +2129,20 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                     xAxis2: {
                         axis: "x",
                         type: "category",
-                        position: 'bottom',   // add this
-                        maxRotation: 0,
-                        minRotation: 0,
+                        title: { display: true, text: 'Richting' },
+                        position: 'top',  
                         offset: true,          // helps avoid overlap with the 'x' ticks row
                         grid: {
                             drawOnChartArea: false, // only want the grid lines for one axis to show up
-                            },
-                            ticks: {
+                        },
+                        ticks: {
+                            maxRotation: 0,
+                            minRotation: 0,
                             callback: function(label) {
                                 let realLabel = this.getLabelForValue(label)
 
-                                var date = realLabel.split(";")[0];
-                                var arrow = realLabel.split(";")[1];
+                                var date = realLabel.split(" ")[0];
+                                var arrow = realLabel.split(" ")[1];
                                 return arrow;
                             }
                         }
@@ -2153,8 +2154,8 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                         ticks: {
                             callback: function(label) {
                                 let realLabel = this.getLabelForValue(label)
-                                var date = realLabel.split(";")[0];
-                                var arrow = realLabel.split(";")[1];
+                                var date = realLabel.split(" ")[0];
+                                var arrow = realLabel.split(" ")[1];
                                 return date;
                             }
                         }
