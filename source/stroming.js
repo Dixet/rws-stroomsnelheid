@@ -523,7 +523,32 @@ async function loadDiveSites() {
         return;
     }
 
+
+    const cleanLocationName = (originalName) => {
+        // Match the parenthesized part (if any)
+        const match = originalName.match(/\s*\(([^)]*)\)\s*/);
+
+        if (match) {
+            const bracketContent = match[1]; // text inside the ()
+            const dashSplit = bracketContent.split(/\s+-\s+/);
+
+            if (dashSplit.length > 1) {
+                // There's an alternative name after a " - " inside the brackets
+                // Take the last segment as the friendly name
+                return dashSplit[dashSplit.length - 1].trim();
+            }
+        }
+
+        // Default: just strip the bracketed part as before
+        return originalName
+            .replace(/\s*\([^)]*\)\s*/g, ' ')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
     const locationsUrl = 'https://rwsos.rws.nl/wb-api/dd/2.0/locations/geojson?sourceName=compute&observationTypeId=SG_SOF_6.1.ms&boundingBox=%5B3.4%2C51.45%2C4.3%2C51.8%5D&';
+    const r = {};
+    r.method = "GET";
 
     diveSiteSelect.disabled = true;
     diveSiteSelect.innerHTML = '<option value="" selected disabled>Duikplaatsen laden...</option>';
@@ -541,7 +566,7 @@ async function loadDiveSites() {
     }
 
     try {
-        const response = await fetch(locationsUrl);
+        const response = await fetch(new Request(locationsUrl, r));
         
         if (!response.ok) {
             const errorText = response.statusText || 'Unknown error';
@@ -560,10 +585,7 @@ async function loadDiveSites() {
 
                 const originalName = String(properties.locationName || properties.locationname || '').trim();
                 const isDiveLocation = /\([^)]*duiklocatie[^)]*\)/i.test(originalName);
-                const cleanedName = originalName
-                    .replace(/\s*\([^)]*\)\s*/g, ' ')
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
+                const cleanedName = cleanLocationName(originalName);
 
                 return {
                     id: properties.id,
@@ -702,11 +724,13 @@ async function fetchData() {
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
+        const r = {};
+        r.method = "GET";
         let response_speed, response_direction, response_hoogte;
         try {
-            response_speed = await fetch(url_speed);
-            response_direction = await fetch(url_direction);
-            response_hoogte = await fetch(url_hoogte);
+            response_speed = await fetch(new Request(url_speed, r));
+            response_direction = await fetch(new Request(url_direction, r));
+            response_hoogte = await fetch(new Request(url_hoogte, r));
         } catch (fetchError) {
             // Network-level errors (CORS, DNS, etc.) - these don't return a response object
             throw new Error(`Netwerkfout: ${fetchError.message}`);
