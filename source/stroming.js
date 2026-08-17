@@ -1015,12 +1015,12 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         // add helpers to the measurements for later use
         const theta0 = calculateTheta0(currentMeasurements);
         currentMeasurements.forEach((measurement,index) => {
-            if (index >= currentMeasurements.length - 1) {
+            if (index >= currentMeasurements.length - 2) {
                 return;
             }
 
-            const nextMeasurement = currentMeasurements[index + 1];
-            const previousMeasurement = index > 0 ? currentMeasurements[index - 1] : null;
+            const nextMeasurement = currentMeasurements[index + 2];
+            const previousMeasurement = index > 0 ? currentMeasurements[index - 2] : null;
             measurement.signed = calculateSigned(measurement.speed, measurement.direction, theta0);
 
             const signChange = previousMeasurement ? isSignChange(measurement.signed, previousMeasurement.signed, calculateSigned(nextMeasurement.speed, nextMeasurement.direction, theta0)) : false;
