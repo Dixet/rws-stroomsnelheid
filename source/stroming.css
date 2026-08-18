@@ -249,7 +249,7 @@ th {
     top: 0;
     left: 0;
     width: 100%; /* Reduced width to better fit date content */
-    padding-top: 0;
+    padding-top: 10px;
     text-align: left;
     transform: none; /* Position date at the left edge */
     font-size: 1.0em;
@@ -290,6 +290,19 @@ th {
     visibility: visible;
 }
 
+.more-info {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.more-info::after {
+    content: "›";
+    font-size: 0.95em;
+    font-weight: bold;
+    color: #888;
+    line-height: 1;
+}
 
 .timeline-bar {
     height: 30px;
@@ -311,6 +324,7 @@ th {
     pointer-events: auto; /* was: none — nu vangt de kaart zelf ook hover/klik op */
     cursor: pointer;
 }
+
 
 .timeline-row:hover .dive-window-card,
 .timeline-row:focus-within .dive-window-card {

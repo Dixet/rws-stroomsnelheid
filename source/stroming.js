@@ -1616,7 +1616,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
             const moreInfo = document.createElement('div');
             moreInfo.className = 'more-info';
-            moreInfo.textContent = '🔍';
+            moreInfo.textContent = ' ';
             moreInfo.setAttribute('role', 'button');
             moreInfo.setAttribute('aria-label', 'Bekijk extra informatie over dit duikvenster');
             moreInfo.tabIndex = 0;
@@ -1672,7 +1672,20 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         // Add spacing and append timeline to the page
         timelineContainer.style.marginBottom = "20px";
         diveWindowsContainer.appendChild(timelineContainer);
+
         
+        // Eenmalige hint-animatie zodat nieuwe bezoekers zien dat duikvensters klikbaar zijn
+        if (!localStorage.getItem('duikvensterHintGetoond')) {
+            const eersteKaart = timelineContainer.querySelector('.dive-window-card');
+            if (eersteKaart) {
+                eersteKaart.classList.add('tap-hint');
+                eersteKaart.addEventListener('animationend', () => {
+                    eersteKaart.classList.remove('tap-hint');
+                }, { once: true });
+            }
+            localStorage.setItem('duikvensterHintGetoond', 'true');
+        }
+
         // Add mobile scroll hint for timeline
         const scrollHint = document.createElement('div');
         scrollHint.className = 'scroll-hint';
