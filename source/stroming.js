@@ -9,6 +9,24 @@ function getViewportWidth() {
             1200; // Fallback to a reasonable default
 }
 
+// Show info popup when help icon is clicked
+document.getElementById('help-icon').addEventListener('click', function() {
+    document.getElementById('info-popup').style.display = 'block';
+});
+
+// Close info popup when close button is clicked
+document.getElementById('close-popup').addEventListener('click', function() {
+    document.getElementById('info-popup').style.display = 'none';
+});
+
+// Close info popup when clicking outside the popup content
+window.addEventListener('click', function(event) {
+    const popup = document.getElementById('info-popup');
+    if (event.target === popup) {
+        popup.style.display = 'none';
+    }
+});
+
 /**
  * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
  * The maximum end date is exactly three days after the start date.
