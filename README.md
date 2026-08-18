@@ -29,7 +29,7 @@ De kaartachtergrond komt van OpenStreetMap. Rijkswaterstaat maakt een voorspelli
 ## Uitleg van het scherm
 
 ### 1) Gebruikersinvoer
-<img style="width: 80%;" alt="Screenshot 2026-03-03 132451" src="https://github.com/user-attachments/assets/03539ccd-e015-4c29-8495-331704a95505" />
+<img style="width: 90%;margin-left: auto;margin-right: auto;" alt="Screenshot 2026-03-03 132451" src="https://github.com/user-attachments/assets/03539ccd-e015-4c29-8495-331704a95505" />
 
 De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke periode** je stromingsinformatie wilt ophalen.
 
@@ -57,7 +57,7 @@ De stroomsnelheid wordt in kleurgradaties weergegeven van rood (duiken afgeraden
 Daarnaast wordt een icoon getoond voor de maanfasen, en de daaropvolgende spring- of doodtij. 
 
 ### 2) Duikvensters
-<img style="width: 80%;" alt="image" src="https://github.com/user-attachments/assets/9d2ed7b9-0c50-4122-9f91-edbf161a0dc6" />
+<img style="width: 90%;margin-left: auto;margin-right: auto;" src="https://github.com/user-attachments/assets/9d2ed7b9-0c50-4122-9f91-edbf161a0dc6" />
 
 In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten binnen de gekozen periode.
 
@@ -71,7 +71,7 @@ In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten bin
 	- De labels tonen belangrijke omslagpunten in de stroming. Gebruik deze tijden om je duikplanning (te water, omkeren, uit water) beter te timen.
 
 ### 3) Detailvenster
-<img style="width: 80%;" alt="image" src="https://github.com/user-attachments/assets/12d26e55-4c8f-4b2d-8f58-d79c41926ae1" />
+<img style="width: 90%;margin-left: auto;margin-right: auto;" alt="image" src="https://github.com/user-attachments/assets/12d26e55-4c8f-4b2d-8f58-d79c41926ae1" />
 
 Wanneer geklikt wordt op de chevron › of op het duikvenster opent een detailscherm met:
 - **Detailinformatie**
@@ -83,7 +83,7 @@ Wanneer geklikt wordt op de chevron › of op het duikvenster opent een detailsc
     - Aanwijzer voor het tijdstip van de kentering 
 
 ### 4) Stromingsdetails
-<img style="width: 80%;" alt="Screenshot 2026-03-03 140321" src="https://github.com/user-attachments/assets/f8163199-5f45-4c80-94fd-c2cc6fbe853b" />
+<img style="width: 90%;margin-left: auto;margin-right: auto;" alt="Screenshot 2026-03-03 140321" src="https://github.com/user-attachments/assets/f8163199-5f45-4c80-94fd-c2cc6fbe853b" />
 
 Dit onderdeel geeft de gedetailleerde metingen in tabelvorm.
 
