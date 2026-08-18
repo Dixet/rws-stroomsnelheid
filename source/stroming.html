@@ -43,6 +43,11 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" 
         crossorigin="anonymous">
     </script>
+    <script
+        src="https://unpkg.com/marked@18.0.10/lib/marked.umd.js"
+        integrity="sha384-JD1I1oSYdjlw8850MjNFhpmRtgBZ97SjJYg9IJUE1RxR3DgG8oo4R43qLGMkd99t"
+        crossorigin="anonymous">
+    </script>
     <script src="stroming.js?v=2" defer></script>
     <link rel="stylesheet" href="stroming.css?v=2">
 </head>
@@ -50,7 +55,91 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
     <!-- Fixed back to top button -->
     <button id="fixed-back-to-top" class="fixed-back-to-top" onclick="scrollToTop()" aria-label="Terug naar boven">↑ Top</button>
     
-    <h1><img src="images/android-chrome-512x512.png" alt="Duikstek stromingsvoorspelling" title="Duikstek stromingsvoorspelling" class="site-logo"> Duikstek stromingsvoorspelling</h1>
+    <!-- Help icon -->
+    <button id="help-icon" class="help-icon" aria-label="Help en informatie">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+        </svg>
+    </button>
+    
+    <!-- Info popup -->
+    <div id="info-popup" class="info-popup">
+        <div class="info-popup-content">
+            <span class="close-popup" id="close-popup">✕</span>
+            <section class="info-pagina" id="info-pagina">
+                <h1><img src="images/android-chrome-512x512.png" alt="Duikstek stromingsvoorspelling" title="Duikstek stromingsvoorspelling" class="site-logo"> Over deze site</h1>
+                <h2>Waarvoor is deze site bedoeld?</h2>
+                <p>
+                    Wil je duiken in de Oosterschelde? Dan is het handig om vooraf te weten hoe hard het water stroomt.
+                    Deze site helpt je daarbij: je kiest een duiklocatie en een periode, en je ziet direct wanneer de
+                    stroming rustig genoeg is om te duiken en wanneer je beter kunt wachten.
+                </p>
+                <p>
+                    Zo kun je je duik plannen rond de momenten met de minste stroming, in plaats van te gokken of
+                    achteraf verrast te worden door een sterke stroom.
+                </p>
+                <h2>Waar komen de gegevens vandaan?</h2>
+                <p>
+                    De stromingsgegevens komen van <strong><a target="_blank" href="https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland">Rijkswaterstaat</a></strong>, de officiële instantie die de
+                    Nederlandse wateren monitort en voorspelt. 
+                </p>
+                <p>
+                    Deze site gebruikt die officiële voorspellingen en zet ze om in een overzicht dat makkelijk te
+                    lezen is voor duikers: met duidelijke kleuren, tijdlijnen en duikvensters, in plaats van ruwe cijfers.
+                </p>
+                <h2>Hoe gebruik je de site?</h2>
+                <h3>Stap 1: Kies je duiklocatie</h3>
+                <p>
+                    Selecteer een locatie uit de lijst, of klik op een markering op de kaart. Wil je alleen bekende
+                    duiklocaties zien? Vink dan <em>"Toon alleen duiklocaties"</em> aan.
+                </p>
+                <h3>Stap 2: Kies je periode</h3>
+                <p>
+                    Stel in vanaf wanneer en tot wanneer je de stroming wilt bekijken, bijvoorbeeld de datum en het
+                    tijdvak waarin je wilt duiken.
+                </p>
+                <h3>Stap 3: Bekijk de duikvensters</h3>
+                <p>
+                    Klik op <strong>"Toon duikvensters"</strong>. Je krijgt nu een overzicht van de beste momenten
+                    om te duiken binnen jouw gekozen periode.
+                </p>
+                <h3>Stap 4: Lees de kleuren</h3>
+                <p>
+                    De stroming wordt weergegeven in kleuren: van groen (rustige, gunstige stroming) tot rood
+                    (sterke stroming, duiken wordt afgeraden). Zo zie je in één oogopslag wanneer het beste moment is.
+                </p>
+                <p>
+                    Daarnaast zie je een icoontje voor de maanstand en of het spring- of doodtij is - dit heeft
+                    namelijk invloed op hoe hard het water stroomt.
+                </p>
+                <h3>Stap 5: Bekijk de details (optioneel)</h3>
+                <p>
+                    Wil je precies weten hoe de stroming zich binnen een venster ontwikkelt? Klik/tik op het duikvenster of op een duikvenster voor een grafiek met de stroomsnelheid en -richting per tijdstip.
+                </p>
+                <p>
+                    Onderaan de pagina vind je ook een tabel met alle exacte waarden per tijdstip: de stroomsnelheid
+                    (in cm/s) en de richting. Handig als je precies wilt weten wat je onder water kunt verwachten.
+                </p>
+                <h2>Let op: gebruik je gezond verstand</h2>
+                <p>
+                    Deze site is een <strong>hulpmiddel</strong>, geen garantie. Denk hierbij aan:
+                </p>
+                <ul>
+                    <li>De gegevens komen van externe bronnen en kunnen soms vertraagd zijn of ontbreken.</li>
+                    <li>Lokale omstandigheden - zoals wind, zicht of de exacte vorm van de duiklocatie - kunnen afwijken van wat de site laat zien.</li>
+                    <li>Vertrouw nooit blind op de voorspelling: check altijd de situatie ter plaatse en volg de geldende duik- en veiligheidsrichtlijnen.</li>
+                </ul>
+                <hr>
+                <p>Heb je een vraag of suggestie? Maak dan een issue aan op de <a href="https://github.com/Dixet/rws-stroomsnelheid/issues" target="_blank" rel="noopener noreferrer" aria-label="Meld een probleem of doe een suggestie">
+                <span>Github pagina</span>
+            </a></p>
+            </section>
+        </div>
+    </div>
+    
+    <h1><img src="images/android-chrome-512x512.png" alt="Stromingsgids" title="Stromingsgids" class="site-logo"> Stromingsgids</h1>
     <div class="form-map-layout">
         <form onsubmit="event.preventDefault(); fetchData();">
             <div class="form-row">
@@ -126,7 +215,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
     <div id="results"></div>
     <div id="source">
         <span class="disclaimer-title">Disclaimer</span>
-        <span class="disclaimer-text">De stromingsgegevens op deze pagina zijn afkomstig van <a href="https://rwsos.rws.nl/viewer/map/oosterschelde/stroming">Rijkswaterstaat</a> en worden uitsluitend ter informatie aangeboden. Aan de weergegeven informatie kunnen geen rechten worden ontleend.<br>Duiken in de Oosterschelde brengt risico's met zich mee. Elke duiker is zelf verantwoordelijk voor een veilige duikplanning en dient de lokale omstandigheden — waaronder stroming, zicht, weer en getij — altijd ter plaatse te beoordelen voordat er wordt gedoken. Deze pagina vervangt niet het eigen oordeelsvermogen van de duiker.</span>
+        <span class="disclaimer-text">De stromingsgegevens op deze pagina zijn afkomstig van <a href="https://rwsos.rws.nl/viewer/map/oosterschelde/stroming">Rijkswaterstaat</a> en worden uitsluitend ter informatie aangeboden. Aan de weergegeven informatie kunnen geen rechten worden ontleend.<br>Duiken in de Oosterschelde brengt risico's met zich mee. Elke duiker is zelf verantwoordelijk voor een veilige duikplanning en dient de lokale omstandigheden - waaronder stroming, zicht, weer en getij - altijd ter plaatse te beoordelen voordat er wordt gedoken. Deze pagina vervangt niet het eigen oordeelsvermogen van de duiker.</span>
     </div>
     <div id="github-link">
         <div class="link-group">

@@ -9,6 +9,24 @@ function getViewportWidth() {
             1200; // Fallback to a reasonable default
 }
 
+// Show info popup when help icon is clicked
+document.getElementById('help-icon').addEventListener('click', function() {
+    document.getElementById('info-popup').style.display = 'block';
+});
+
+// Close info popup when close button is clicked
+document.getElementById('close-popup').addEventListener('click', function() {
+    document.getElementById('info-popup').style.display = 'none';
+});
+
+// Close info popup when clicking outside the popup content
+window.addEventListener('click', function(event) {
+    const popup = document.getElementById('info-popup');
+    if (event.target === popup) {
+        popup.style.display = 'none';
+    }
+});
+
 /**
  * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
  * The maximum end date is exactly three days after the start date.
@@ -1890,7 +1908,7 @@ function LocalToUTC(localstring) {
 }
 
 // Initialize the page when it loads - set default date/time values and UI behavior
-window.onload = function() {
+window.onload = async function() {
     setDefaultDateTime();
 
     const diveSiteSelect = document.getElementById('diveSite');
@@ -1900,6 +1918,12 @@ window.onload = function() {
     const startTimeInput = document.getElementById('startTime');
     const endDateInput = document.getElementById('endDate');
     const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
+    const infoPage = document.getElementById('info-pagina');
+
+    const MarkdownReadme = await getGithubREADME('rws-stroomsnelheid','Dixet');
+    const htmlReadme = marked.parse(MarkdownReadme);
+
+    infoPage.innerHTML = htmlReadme;
 
     if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
         diveSiteSelect.addEventListener('change', () => {
@@ -2315,3 +2339,23 @@ function setupBackToTopButton() {
         }
     });
 }
+
+/* get readme markdown file from github */
+async function getGithubREADME(repo, owner) {
+    const errortext = `# RWS Stroomsnelheid
+Helaas is er even geen informatietekst beschikbaar
+`;
+    try {
+        const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`);
+        if (!response.ok) {
+            console.error('Failed to fetch README:', response.statusText);
+            return errortext;
+        }
+        const text = await response.text();
+        return text;
+    } catch (error) {
+        console.error('Error fetching README:', error);
+        return errortext;
+    }
+}
+
