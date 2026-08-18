@@ -249,7 +249,7 @@ th {
     top: 0;
     left: 0;
     width: 100%; /* Reduced width to better fit date content */
-    padding-top: 10px;
+    padding-top: 15px;
     text-align: left;
     transform: none; /* Position date at the left edge */
     font-size: 1.0em;
