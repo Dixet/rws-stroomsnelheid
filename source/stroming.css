@@ -270,6 +270,15 @@ th {
     background-color: #ccc;        /* adjust to match your theme */
 }
 
+.timeline-row.has-date-label {
+    padding-top: 110px; /* +20px extra ruimte, alleen bij een nieuwe datum */
+}
+.timeline-row.has-date-label .more-info {
+    top: 125px;
+}
+.timeline-row.has-date-label .dive-window-card {
+    top: 40px;
+}
 
 .more-info {
     position: absolute;
@@ -288,6 +297,46 @@ th {
     border-radius: 4px;
     flex-shrink: 0;
     /* Width is set dynamically via JavaScript based on screen size */
+}
+
+
+.dive-window-card {
+    position: absolute;
+    top: 20px;
+    height: 145px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    transition: box-shadow 0.15s ease, transform 0.1s ease;
+    pointer-events: auto; /* was: none — nu vangt de kaart zelf ook hover/klik op */
+    cursor: pointer;
+}
+
+.timeline-row:hover .dive-window-card,
+.timeline-row:focus-within .dive-window-card {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.timeline-row:active .dive-window-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transform: scale(0.99);
+}
+
+.timeline-row:focus-within .dive-window-card {
+    outline: 2px solid #2b7cd3;
+    outline-offset: 2px;
+}
+
+@keyframes tap-hint-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+.dive-window-card.tap-hint {
+    animation: tap-hint-pulse 0.8s ease-in-out 2;
+    box-shadow: 0 0 0 4px rgba(43, 124, 211, 0.25), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+@media (prefers-reduced-motion: reduce) {
+    .dive-window-card.tap-hint { animation: none; }
 }
 
 /* Responsive timeline bar sizing */

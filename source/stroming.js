@@ -1308,6 +1308,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
+                timelineRow.classList.add('has-date-label'); // extra ruimte alleen op deze rij
                 const dateLabel = document.createElement('div');
                 dateLabel.className = 'timeline-date';
                 dateLabel.textContent = formatDateLabel(window.slackTime.timeStamp);
@@ -1370,7 +1371,16 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             }
 
             timelineBar.style.width = `${barWidth}px`;
-            
+
+            // Achtergrondkaart die het hele duikvenster omvat: icoon, balk én labels
+            // erboven/eronder — met witruimte tussen inhoud en rand.
+            const windowCard = document.createElement('div');
+            windowCard.className = 'dive-window-card';
+            windowCard.setAttribute('aria-hidden', 'true');
+            windowCard.style.left = '-15px';
+            windowCard.style.width = `${barWidth + 65}px`; // 25px bar-inspring + 25px marge rechts + 15px marge links
+            timelineRow.appendChild(windowCard);            
+
             // Add filler segment first if needed to align slack times
             if (fillerDuration > 0) {
                 const fillerSegment = document.createElement('div');
@@ -1647,6 +1657,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 }
             });            
             
+            windowCard.addEventListener('click', openPopup); // vangt klikken in de witruimte van de kaart op
+
             // Assemble the complete timeline row
             timelineBarContainer.appendChild(timelineBar);
             timelineBarContainer.appendChild(timeLabels);
@@ -1675,6 +1687,14 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         dateLabels.forEach(label => {
             label.style.width = maxDateLabelWidth + 'px';
+        });
+
+        // Alle duikvenster-kaarten dezelfde breedte geven, gebaseerd op de breedste balk
+        const cards = timelineContainer.querySelectorAll('.dive-window-card');
+        const maxCardWidth = getMaxElementWidth(bars) + 65; // zelfde marge (25 + 25 + 15) als bij het aanmaken
+
+        cards.forEach(card => {
+            card.style.width = maxCardWidth + 'px';
         });
 
         // PHASE 3: Create detailed current data table (collapsible section)
