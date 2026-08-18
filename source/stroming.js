@@ -1908,7 +1908,7 @@ function LocalToUTC(localstring) {
 }
 
 // Initialize the page when it loads - set default date/time values and UI behavior
-window.onload = function() {
+window.onload = async function() {
     setDefaultDateTime();
 
     const diveSiteSelect = document.getElementById('diveSite');
@@ -1918,6 +1918,12 @@ window.onload = function() {
     const startTimeInput = document.getElementById('startTime');
     const endDateInput = document.getElementById('endDate');
     const onlyDiveLocationsCheckbox = document.getElementById('onlyDiveLocations');
+    const infoPage = document.getElementById('info-pagina');
+
+    const MarkdownReadme = await getGithubREADME('rws-stroomsnelheid','Dixet');
+    const htmlReadme = marked.parse(MarkdownReadme);
+
+    infoPage.innerHTML = htmlReadme;
 
     if (diveSiteSelect && diveWindowsContainer && resultsContainer) {
         diveSiteSelect.addEventListener('change', () => {
@@ -2333,3 +2339,14 @@ function setupBackToTopButton() {
         }
     });
 }
+
+/* get readme markdown file from github */
+async function getGithubREADME(repo, owner) {
+    const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch README');
+    }
+    const text = await response.text();
+    return text;
+}
+

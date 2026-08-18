@@ -43,6 +43,11 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY" 
         crossorigin="anonymous">
     </script>
+    <script
+        src="https://unpkg.com/marked@18.0.10/lib/marked.umd.js"
+        integrity="sha384-JD1I1oSYdjlw8850MjNFhpmRtgBZ97SjJYg9IJUE1RxR3DgG8oo4R43qLGMkd99t"
+        crossorigin="anonymous">
+    </script>
     <script src="stroming.js?v=2" defer></script>
     <link rel="stylesheet" href="stroming.css?v=2">
 </head>
@@ -63,7 +68,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
     <div id="info-popup" class="info-popup">
         <div class="info-popup-content">
             <span class="close-popup" id="close-popup">✕</span>
-            <section class="info-pagina">
+            <section class="info-pagina" id="info-pagina">
                 <h1><img src="images/android-chrome-512x512.png" alt="Duikstek stromingsvoorspelling" title="Duikstek stromingsvoorspelling" class="site-logo"> Over deze site</h1>
                 <h2>Waarvoor is deze site bedoeld?</h2>
                 <p>
