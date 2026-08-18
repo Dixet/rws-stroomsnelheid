@@ -14,11 +14,13 @@ De gegevens op deze pagina komen van **[Rijkswaterstaat Waterberichtgeving](http
 Rijkswaterstaat maakt een voorspelling van de stroomsnelheid maximaal 36 uur vooruit. Verder vooruit kan je dus ook met deze pagina niet kijken. 
 
 ## Gebruik in het kort
-1. Open de pagina in je browser.
-2. Kies een locatie (via lijst of kaart).
-3. Stel start- en einddatum/tijd in.
-4. Klik op **Toon duikvensters**.
-5. Bekijk de duikvensters en stromingsdetails.
+1. Kies een locatie (via lijst of kaart).
+2. Stel start- en einddatum/tijd in.
+3. Klik op **Toon duikvensters**.
+4. Bekijk de duikvensters en stromingsdetails.
+
+> [!TIP]
+> Je kan de pagina als webapp toevoegen aan het startscherm van je smartphone
 
 ## Uitleg van het scherm
 ### 1) Gebruikersinvoer
