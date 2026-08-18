@@ -60,7 +60,7 @@ De stroomsnelheid wordt in kleurgradaties weergegeven van rood (duiken afgeraden
 Daarnaast wordt een icoon getoond voor de maanfasen, en de daaropvolgende spring- of doodtij. 
 
 ### 2) Duikvensters
-<img width="1929" height="601" alt="image" src="https://github.com/user-attachments/assets/66cfbef4-6345-47f7-b311-72fe59bac677" />
+<img width="889" height="431" alt="image" src="https://github.com/user-attachments/assets/9d2ed7b9-0c50-4122-9f91-edbf161a0dc6" />
 
 In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten binnen de gekozen periode.
 
