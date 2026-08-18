@@ -3,14 +3,11 @@
 Deze pagina helpt duikers in Zeeland om een inschatting te maken van stroming rond een gekozen duiklocatie en tijdsperiode.
 
 <a href='https://ko-fi.com/V4M3244P6B' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
-## Waarvoor kun je deze pagina gebruiken?
 
-Je gebruikt de pagina om:
+## Waarvoor is deze site bedoeld?
+Wil je duiken in de Oosterschelde? Dan is het handig om vooraf te weten hoe hard het water stroomt. Deze site helpt je daarbij: je kiest een duiklocatie en een periode, en je ziet direct wanneer de stroming rustig genoeg is om te duiken en wanneer je beter kunt wachten.
 
-- een duiklocatie te kiezen;
-- een periode (start/einde) te selecteren;
-- te zien wanneer de stroming gunstiger of minder gunstig is om te duiken;
-- een overzicht te krijgen in duikvensters en stromingsdetails.
+Zo kun je je duik plannen rond de momenten met de minste stroming, in plaats van te gokken of achteraf verrast te worden door een sterke stroom.
 
 ## Voor wie is deze pagina bedoeld?
 
@@ -19,14 +16,14 @@ Deze pagina is bedoeld voor duikers die in Zeeland duiken en vooraf een praktisc
 ## Herkomst van de gegevens
 
 De gegevens op deze pagina komen van **[Rijkswaterstaat Waterberichtgeving](https://waterberichtgeving.rws.nl/owb/regio/regio-zeeuwse-wateren/duikstekken-zeeland)** (RWS API).
-De kaartachtergrond komt van OpenStreetMap.
+De kaartachtergrond komt van OpenStreetMap. Rijkswaterstaat maakt een voorspelling van de stroomsnelheid maximaal 36 uur vooruit. Verder vooruit kan je dus ook met deze pagina niet kijken. 
 
 ## Gebruik in het kort
 
 1. Open de pagina in je browser.
 2. Kies een locatie (via lijst of kaart).
 3. Stel start- en einddatum/tijd in.
-4. Klik op **Toon stroming**.
+4. Klik op **Toon duikvensters**.
 5. Bekijk de duikvensters en stromingsdetails.
 
 ## Uitleg van het scherm
@@ -54,6 +51,7 @@ De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke 
 - **Toon duikvensters**
 	- Betekenis: haalt de gegevens op en toont resultaten.
 	- Gebruik: klik nadat locatie en periode zijn ingevuld.
+   
 ### 2) Legenda
 <img width="500" alt="legenda" src="https://github.com/user-attachments/assets/e530f21e-ce42-412c-b3c1-f46176c64203" />
 
@@ -66,22 +64,18 @@ Daarnaast wordt een icoon getoond voor de maanfasen, en de daaropvolgende spring
 In dit onderdeel zie je een samenvatting van de meest bruikbare duikmomenten binnen de gekozen periode.
 
 - **Datumscheiding**
-	- Betekenis: toont de datum waarop het duikvenster valt (gemeten voor het moment van kentering)
- 	- Lezen: naast de datum wordt indien van toepassing de maanfase of spring- of doodtij icoon getoond 
+	- Toont de datum waarop het duikvenster valt (gemeten op het moment van kentering). Naast de datum wordt indien van toepassing de maanfase of spring- of doodtij icoon getoond
 - **Tijdlijnen per dag/per venster**
-	- Betekenis: laten zien hoe de stroming in de tijd verandert.
-	- Lezen: Iedere balk toont een venster van piekstroming tot piekstroming, met kleur- en tijdsmarkeringen voor verschillende stroomsnelheden tussen die pieken
+	- De duikvensters laten zien hoe de stroming in de tijd verandert. Iedere balk toont een venster van piekstroming tot piekstroming, met kleur- en tijdsmarkeringen voor verschillende stroomsnelheden tussen die pieken
 - **Kleuren in de balken**
-	- Betekenis: geven de sterkte van de stroming aan (zie legenda).
-	- Lezen: gunstiger stukken zijn rustiger kleuren; ongunstiger stukken zijn waarschuwingskleuren.
+	- Deze geven de sterkte van de stroming aan (zie legenda). Gunstiger stroming wordt weergegeven met rustiger kleuren; ongunstiger periodes zijn waarschuwingskleuren.
 - **Tijdlabels en markeringen**
-	- Betekenis: tonen belangrijke omslagpunten in de stroming.
-	- Lezen: gebruik deze tijden om je duikplanning (te water, omkeren, uit water) beter te timen.
+	- De labels tonen belangrijke omslagpunten in de stroming. Gebruik deze tijden om je duikplanning (te water, omkeren, uit water) beter te timen.
 
 ### 3) Detailvenster
 <img width="700" alt="image" src="https://github.com/user-attachments/assets/12d26e55-4c8f-4b2d-8f58-d79c41926ae1" />
 
-Wanneer geklikt wordt op het vergrootglas 🔍 of op het duikvenster opent een detailscherm met:
+Wanneer geklikt wordt op de chevron › of op het duikvenster opent een detailscherm met:
 - **Detailinformatie**
     - Lengte en start- en eindtijd van de duikvensters
     - Getij-extreem en tijdstip van de stromingskentering
