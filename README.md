@@ -53,8 +53,6 @@ De invoersectie gebruik je om te bepalen **voor welke locatie** en **voor welke 
 	- Gebruik: klik nadat locatie en periode zijn ingevuld.
    
 ### 2) Legenda
-<img style="width: 80%;" alt="legenda" src="https://github.com/user-attachments/assets/e530f21e-ce42-412c-b3c1-f46176c64203" />
-
 De stroomsnelheid wordt in kleurgradaties weergegeven van rood (duiken afgeraden) tot groen (lichte stroming). 
 Daarnaast wordt een icoon getoond voor de maanfasen, en de daaropvolgende spring- of doodtij. 
 
