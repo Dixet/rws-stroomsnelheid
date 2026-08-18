@@ -1,4 +1,4 @@
-# RWS Stroomsnelheid
+# <img style="width: 1.3em;" alt="Screenshot 2026-03-03 132451" src="https://www.stromingsgids.nl/images/android-chrome-512x512.png" /> RWS Stroomsnelheid
 Deze pagina helpt duikers in Zeeland om een inschatting te maken van stroming rond een gekozen duiklocatie en tijdsperiode.
 
 ## Waarvoor is deze site bedoeld?
