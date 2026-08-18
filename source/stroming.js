@@ -2342,11 +2342,20 @@ function setupBackToTopButton() {
 
 /* get readme markdown file from github */
 async function getGithubREADME(repo, owner) {
-    const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch README');
+    const errortext = `# RWS Stroomsnelheid
+Helaas is er even geen informatietekst beschikbaar
+`;
+    try {
+        const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`);
+        if (!response.ok) {
+            console.error('Failed to fetch README:', response.statusText);
+            return errortext;
+        }
+        const text = await response.text();
+        return text;
+    } catch (error) {
+        console.error('Error fetching README:', error);
+        return errortext;
     }
-    const text = await response.text();
-    return text;
 }
 
