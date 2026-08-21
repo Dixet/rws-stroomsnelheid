@@ -969,14 +969,14 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         const isLocalPeak = (index) => {
             const speed = currentMeasurements[index].speed;
-            if (index === 0) {
-                return speed > currentMeasurements[index + 1].speed + FLOAT_TOLERANCE;
+            if (index <= 1) {
+                return speed > currentMeasurements[index + 2].speed + FLOAT_TOLERANCE;
             }
-            if (index === currentMeasurements.length - 1) {
-                return speed > currentMeasurements[index - 1].speed + FLOAT_TOLERANCE;
+            if (index >= currentMeasurements.length - 2) {
+                return speed > currentMeasurements[index - 2].speed + FLOAT_TOLERANCE;
             }
-            const prevSpeed = currentMeasurements[index - 1].speed;
-            const nextSpeed = currentMeasurements[index + 1].speed;
+            const prevSpeed = currentMeasurements[index - 2].speed;
+            const nextSpeed = currentMeasurements[index + 2].speed;
             return speed >= prevSpeed - FLOAT_TOLERANCE &&
                 speed >= nextSpeed - FLOAT_TOLERANCE &&
                 (speed > prevSpeed + FLOAT_TOLERANCE || speed > nextSpeed + FLOAT_TOLERANCE);
@@ -1040,14 +1040,14 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         const isLocalMinimum = (index) => {
             const speed = currentMeasurements[index].speed;
-            if (index === 0) {
-                return speed < currentMeasurements[index + 1].speed - FLOAT_TOLERANCE;
+            if (index <= 1 ) {
+                return speed < currentMeasurements[index + 2].speed - FLOAT_TOLERANCE;
             }
-            if (index === currentMeasurements.length - 1) {
-                return speed < currentMeasurements[index - 1].speed - FLOAT_TOLERANCE;
+            if (index >= currentMeasurements.length - 1) {
+                return speed < currentMeasurements[index - 2].speed - FLOAT_TOLERANCE;
             }
-            const prevSpeed = currentMeasurements[index - 1].speed;
-            const nextSpeed = currentMeasurements[index + 1].speed;
+            const prevSpeed = currentMeasurements[index - 2].speed;
+            const nextSpeed = currentMeasurements[index + 2].speed;
             return speed <= prevSpeed + FLOAT_TOLERANCE &&
                 speed <= nextSpeed + FLOAT_TOLERANCE &&
                 (speed < prevSpeed - FLOAT_TOLERANCE || speed < nextSpeed - FLOAT_TOLERANCE);
@@ -2132,8 +2132,8 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                 if (nextBand !== band) {
                     const threshold = getBoundaryThreshold(band, nextBand);
                     if (threshold !== null) {
-                        const boundaryLabel = `${formatTime(nextItem.timeStamp)} ${getWindDirection(nextItem.direction).arrow}`;
-                        labels.push(boundaryLabel);
+                        // const boundaryLabel = `${formatTime(nextItem.timeStamp)} ${getWindDirection(nextItem.direction).arrow}`;
+                        // labels.push(boundaryLabel);
                         lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : (band === 'low' || nextBand === 'low') && threshold === 30 ? 30 : null);
                         mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
                         highSpeed.push((band === 'high' || nextBand === 'high') && threshold === 30 ? 30 : null);
