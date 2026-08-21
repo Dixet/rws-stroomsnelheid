@@ -1371,22 +1371,13 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             
             // Calculate consistent pixels-per-minute ratio for all timeline bars
             // This ensures segments with the same duration have the same pixel width across all bars
-            const maxTotalDuration = maxDuration //+ maxStartToSlackTime;
+            // maxTotalDuration must include the maximum filler to ensure proper scaling
+            const maxTotalDuration = maxDuration + maxStartToSlackTime;
             const pixelsPerMinute = baseWidth / maxTotalDuration;
             
             // Scale bar width proportionally to window duration plus filler using consistent scale
             const totalDuration = window.duration + fillerDuration;
-            let barWidth = totalDuration * pixelsPerMinute;
-            
-            // Ensure minimum width for very short durations on large screens
-            if (screenWidth >= 900) {
-                barWidth = Math.max(barWidth, baseWidth * 0.6); // At least 60% of base width
-                // Recalculate pixels per minute if we had to apply minimum width
-                if (barWidth === baseWidth * 0.6) {
-                    // Only recalculate if this bar was adjusted to minimum width
-                    const adjustedPixelsPerMinute = barWidth / totalDuration;
-                }
-            }
+            const barWidth = totalDuration * pixelsPerMinute;
 
             timelineBar.style.width = `${barWidth}px`;
 
@@ -1512,7 +1503,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 }
                 
                 // Calculate width in pixels using consistent pixels-per-minute ratio
-                // This ensures segments with the same duration appear the same width across all timeline bars
                 const segmentWidthPx = segment.duration * pixelsPerMinute;
                 segmentDiv.style.width = `${segmentWidthPx}px`;
                 
@@ -1573,18 +1563,21 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             // Counter for staggering labels
             let labelCount = 0;
             
-            // Start of window label - adjusted for filler using consistent pixel scale
+            // Start of window label - positioned relative to actual bar width
+            // Note: filler uses original pixelsPerMinute, but label position accounts for actual segment positioning
             const startLabelPosition = fillerDuration > 0 ? 
                 fillerDuration * pixelsPerMinute : 0;
             createLabel(window.windowStart, startLabelPosition, 'start', labelCount % 2 === 0);
             labelCount++;
 
             // Add labels for each segment transition, but only if there's enough space
+            // Labels are positioned based on cumulative duration * consistent pixelsPerMinute
             let cumulativeDuration = fillerDuration;
             segments.forEach((segment, index) => {
                 // Add label at the start of each segment (except the first one, which is the window start)
                 if (index > 0) {
                     const segmentStartPosition = cumulativeDuration * pixelsPerMinute;
+                    
                     // Find the measurement at this transition point
                     const segmentStartTime = new Date(segment.startTime);
                     const transitionMeasurement = currentMeasurements.find(m => 
@@ -1598,9 +1591,9 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 cumulativeDuration += segment.duration;
             });
 
-            // End of window label using consistent pixel scale
-            const endLabelPosition = fillerDuration > 0 ? 
-                (fillerDuration + window.duration) * pixelsPerMinute : barWidth;
+            // End of window label should be at the end of the bar
+            // The bar's total width is barWidth, so end label goes at barWidth
+            const endLabelPosition = barWidth;
             createLabel(window.windowEnd, endLabelPosition, 'end', labelCount % 2 === 0);
             labelCount++;
 
@@ -2270,7 +2263,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                                 borderRadius: 4,
                                 position: 'top',
                                 xAdjust: 10,
-                                yAdjust: -150,
+                                yAdjust: -80,
                                 callout: {
                                     display: true,
                                     borderColor: 'rgba(0, 102, 0, 0.8)',
