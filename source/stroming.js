@@ -2263,7 +2263,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                                 borderRadius: 4,
                                 position: 'top',
                                 xAdjust: 10,
-                                yAdjust: -40,
+                                yAdjust: -80,
                                 callout: {
                                     display: true,
                                     borderColor: 'rgba(0, 102, 0, 0.8)',
