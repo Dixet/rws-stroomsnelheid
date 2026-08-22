@@ -914,7 +914,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         };
 
         const FLOAT_TOLERANCE = 1e-9;
-        const DIRECTION_CHANGE_THRESHOLD_DEGREES = 100;
+        const DIRECTION_CHANGE_THRESHOLD_DEGREES = 80;
 
         const approximatelyEqual = (valueA, valueB) => Math.abs(valueA - valueB) < FLOAT_TOLERANCE;
 
