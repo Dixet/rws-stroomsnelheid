@@ -2118,28 +2118,28 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         windowData.measurements.forEach((item, index) => {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
+            // make sure there are no gaps in the chart when transitioning between bands by adding a point at the boundary threshold
+            nextBand  = null;
+            if (index !== windowData.measurements.length - 1) {
+                const nextItem = windowData.measurements[index + 1];
+                const nextValue = Math.round(nextItem.speed * 100);
+                nextBand  = getBand(nextValue)
+            }
+
+            previousBand  = null;
+            if (index !== 0) {
+                const previousItem = windowData.measurements[index - 1];
+                const previousValue = Math.round(previousItem.speed * 100);
+                previousBand  = getBand(previousValue)
+            }
+
+
             // Use a combined label format to include both time and wind direction to show a time and direction label on the x-axis without cluttering the chart
             labels.push(`${formatTime(item.timeStamp)} ${getWindDirection(item.direction).arrow}`);
             lowSpeed.push(band === 'low' ? value : null);
-            mediumSpeed.push(band === 'medium' ? value : null);
-            highSpeed.push(band === 'high' ? value : null);
+            mediumSpeed.push(band === 'medium' || (nextBand === 'medium' && band === 'low') || (previousBand === 'medium' && band === 'low') ? value : null);
+            highSpeed.push(band === 'high' || ( nextBand === 'high' && (band === 'medium' || band === 'low')) || (previousBand === 'high' && (nextBand === 'low' || nextBand === 'medium'))   ? value : null);
 
-            // make sure there are no gaps in the chart when transitioning between bands by adding a point at the boundary threshold
-            const nextItem = windowData.measurements[index + 1];
-            if (nextItem) {
-                const nextValue = Math.round(nextItem.speed * 100);
-                const nextBand = getBand(nextValue);
-                if (nextBand !== band) {
-                    const threshold = getBoundaryThreshold(band, nextBand);
-                    if (threshold !== null) {
-                        // const boundaryLabel = `${formatTime(nextItem.timeStamp)} ${getWindDirection(nextItem.direction).arrow}`;
-                        // labels.push(boundaryLabel);
-                        lowSpeed.push((band === 'low' || nextBand === 'low') && threshold === 20 ? 20 : (band === 'low' || nextBand === 'low') && threshold === 30 ? 30 : null);
-                        mediumSpeed.push((band === 'medium' || nextBand === 'medium') && threshold === 20 ? 20 : (band === 'medium' || nextBand === 'medium') && threshold === 30 ? 30 : null);
-                        highSpeed.push((band === 'high' || nextBand === 'high') && threshold === 30 ? 30 : null);
-                    }
-                }
-            }
         });
 
         // Find the slack tide index and time for the callout annotation
