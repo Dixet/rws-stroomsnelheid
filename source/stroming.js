@@ -847,8 +847,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                     isPeak: false, // Will be set during peak current calculation
                     isLocalLow: false, // Will be set during slack time calculation
                     isLocalPeak: false, // Will be set during peak current calculation
-                    signed: null, // Will be set during mean direction calculation
-                    signChange: false, // Will be set during sign change detection
                     isDirectionChange: false, // Will be set during direction change detection
                     index: null // Will be set during iteration for local peak/low detection
                 };
@@ -929,42 +927,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         const isDirectionChange = (dir1, dir2) => {
             const angle = calculateAngle(dir1, dir2);
             return angle >= DIRECTION_CHANGE_THRESHOLD_DEGREES;
-        };
-
-        const isSignChange = (value, beforevalue, aftervalue) => {
-            if (typeof value !== 'number' || typeof beforevalue !== 'number' || typeof aftervalue !== 'number') {
-                return false;
-            }
-            return (value < 0 && beforevalue >= 0) || (value >= 0 && beforevalue < 0) || (value < 0 && aftervalue >= 0) || (value >= 0 && aftervalue < 0); 
-        };
-
-        const toRadians = (degrees) => degrees * (Math.PI / 180);
-        const toDegrees = (radians) => radians * (180 / Math.PI);
-
-        const calculateTheta0  = (measurements) => {
-            // filter low speed measurements to avoid noise in theta0 calculation
-            const lowSpeedThreshold = 0.1; // m/s
-            const filteredMeasurements = measurements.filter(entry => entry.speed > lowSpeedThreshold);
-
-            if (filteredMeasurements.length === 0) {
-                return null; // No valid measurements to calculate theta0
-            } else {
-                const sumCos = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.cos(toRadians(entry.direction * 2))), 0);
-                const sumSin = filteredMeasurements.reduce((sum, entry) => sum + ((entry.speed ** 2) * Math.sin(toRadians(entry.direction * 2))), 0);
-                const meanDirectionRad = Math.atan2(sumSin, sumCos);
-                const meanDirectionDeg = toDegrees(meanDirectionRad);
-                const theta0 = ((meanDirectionDeg /2 ) % 360); 
-                return Math.abs(theta0);
-            }
-
-        };
-
-        const calculateSigned = (snelheid, richting, theta0) => {
-            if (typeof snelheid !== 'number' || typeof richting !== 'number' || typeof theta0 !== 'number') {
-                return null;
-            }
-            const signedSpeed = snelheid * Math.cos(toRadians(richting - theta0));
-            return signedSpeed;
         };
 
         const isLocalPeak = (index) => {
@@ -1055,7 +1017,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
 
         // add helpers to the measurements for later use
-        const theta0 = calculateTheta0(currentMeasurements);
         currentMeasurements.forEach((measurement,index) => {
             if (index >= currentMeasurements.length - 2) {
                 return;
@@ -1063,10 +1024,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
             const nextMeasurement = currentMeasurements[index + 2];
             const previousMeasurement = index > 0 ? currentMeasurements[index - 2] : null;
-            measurement.signed = calculateSigned(measurement.speed, measurement.direction, theta0);
 
-            const signChange = previousMeasurement ? isSignChange(measurement.signed, previousMeasurement.signed, calculateSigned(nextMeasurement.speed, nextMeasurement.direction, theta0)) : false;
-            measurement.signChange = signChange;
             measurement.isLocalPeak = isLocalPeak(index);
             measurement.isLocalLow = isLocalMinimum(index);
             measurement.isDirectionChange = nextMeasurement && previousMeasurement ? isDirectionChange(previousMeasurement.direction, nextMeasurement.direction) : false;
