@@ -679,12 +679,6 @@ th {
     box-sizing: border-box;
 }
 
-.legend .legend-columns {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-
 .legend-content.expanded {
     display: block;
     animation: fadeIn 0.3s ease;
