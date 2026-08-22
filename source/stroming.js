@@ -1756,10 +1756,19 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         detailsContainer.appendChild(tableWrapper);
         resultsContainer.appendChild(detailsContainer);
         
-        // Show the legend container (it will be collapsed by default)
+        // Show the legend container and ensure it's collapsed
         const legend = document.querySelector('.legend');
+        const legendToggle = document.querySelector('.legend-toggle');
+        const legendContent = document.getElementById('legend-content');
         if (legend) {
             legend.style.display = 'block';
+            // Ensure legend is collapsed when showing results
+            if (legendToggle && legendContent) {
+                legendToggle.setAttribute('aria-expanded', 'false');
+                legendContent.classList.remove('expanded');
+                // Re-attach event listeners in case legend was re-rendered
+                setupLegendToggle();
+            }
         }
     } else {
         // Handle case where no data is available from the API
