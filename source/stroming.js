@@ -27,6 +27,29 @@ window.addEventListener('click', function(event) {
     }
 });
 
+// Legend toggle functionality
+function setupLegendToggle() {
+    const legendToggle = document.querySelector('.legend-toggle');
+    const legendContent = document.getElementById('legend-content');
+    if (!legendToggle || !legendContent) return;
+    legendToggle.setAttribute('aria-expanded', 'false');
+    legendContent.classList.remove('expanded');
+    legendToggle.addEventListener('click', function() {
+        const isExpanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', String(!isExpanded));
+        legendContent.classList.toggle('expanded', !isExpanded);
+    });
+    legendToggle.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', String(!isExpanded));
+            legendContent.classList.toggle('expanded', !isExpanded);
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', setupLegendToggle);
+
 /**
  * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
  * The maximum end date is exactly three days after the start date.
@@ -1733,8 +1756,11 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         detailsContainer.appendChild(tableWrapper);
         resultsContainer.appendChild(detailsContainer);
         
-        // Show the color-coded legend now that results are displayed
-        legend.style.display = 'inline-block';
+        // Show the legend container (it will be collapsed by default)
+        const legend = document.querySelector('.legend');
+        if (legend) {
+            legend.style.display = 'block';
+        }
     } else {
         // Handle case where no data is available from the API
         resultsContainer.textContent = 'No results found.';

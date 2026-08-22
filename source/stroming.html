@@ -129,8 +129,20 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
     </div>
     
     <div class="legend">
-        <h2>Legenda</h2>
-        <div class="legend-columns">
+        <div class="legend-toggle" tabindex="0" role="button" aria-expanded="false" aria-controls="legend-content">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                <rect x="2" y="2" width="20" height="20" rx="2" fill="#f0f0f0" stroke="#666" stroke-width="1"/>
+                <rect x="5" y="4" width="4" height="4" fill="#c47878"/>
+                <rect x="5" y="10" width="4" height="4" fill="#ffcccc"/>
+                <rect x="5" y="16" width="4" height="4" fill="#81bd81"/>
+                <circle r="2" cx="16" cy="6" fill="#4F6278" stroke="#4D5E76" />
+                <circle r="2" cx="16" cy="12" fill="#DCDFE2" stroke="#4D5E76" />
+                <circle r="2" cx="16" cy="18" fill="#ffffff" stroke="#4D5E76"/>
+            </svg>
+            <span>Legenda</span>
+        </div>
+        <div class="legend-content" id="legend-content">
+            <div class="legend-columns">
             <div class="legend-column">
                 <div class="legend-item"><span class="red"></span> Duiken afgeraden (stroming > 30 cm/s)</div>
                 <div class="legend-item"><span class="orange"></span> Alleen ervaren getijdenduikers (stroming 20-30 cm/s)</div>
@@ -146,8 +158,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 <div class="legend-item"><span"><img src="images/springtide.png" alt=" Springtij" class="moon-icon"></span> Springtij</div>
                 <div class="legend-item"><span"><img src="images/neaptide.png" alt=" Dood tij" class="moon-icon"></span> Dood tij</div>
             </div>
-        </div>
-    </div>
+        </div>        </div>    </div>
     <div id="dive-windows"></div>
     <div id="results"></div>
     <div id="source">
