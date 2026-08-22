@@ -520,8 +520,8 @@ function GetMoonPhaseForDate(timeStamp, moonPhases) {
     });
     const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
     const key = eventDate.toDateString();
-    moonPhase = null;
-    moonPhaseIcon = null;
+    let moonPhase = null;
+    let moonPhaseIcon = null;
     if (phaseByDate.has(key)) {
         moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
         moonPhaseIcon = moonPhaseIcons[phaseByDate.get(key)];
@@ -874,34 +874,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             return (new Date(end.timeStamp) - new Date(start.timeStamp)) / (1000 * 60);
         };
 
-        /**
-         * Format timestamp to display only time portion (HH:MM)
-         * @param {string} timestamp - UTC timestamp string
-         * @returns {string} - Formatted time string
-         */
-        const formatTime = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[1].substring(0,5);
-
-        /**
-         * Format timestamp to display only date portion
-         * @param {string} timestamp - UTC timestamp string
-         * @returns {string} - Formatted date string
-         */
-        const formatDate = (timestamp) => UTCToLocal(timestamp).toLocaleString().split(', ')[0];
-
-        const formatDateLabel = (timestamp) => {
-            const date = new Date(timestamp);
-            const today = new Date();
-            const tomorrow = new Date();
-            tomorrow.setDate(today.getDate() + 1);
-            if (date.toDateString() === today.toDateString()) {
-                return 'Vandaag';
-            } else if (date.toDateString() === tomorrow.toDateString()) {
-                return 'Morgen';
-            } else {
-                return formatDate(timestamp);
-            }
-        };
-
         /* returns the maximum width of a collection of elements in pixels. */
         const getMaxElementWidth = (elements) => {
             const maxWidth = Math.max(
@@ -918,8 +890,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         const calculateAngle = (dir1, dir2) => {
         
-            clockwiseDiff = (dir2 - dir1 + 360) % 360;
-            counterClockwiseDiff = (dir1 - dir2 + 360) % 360;
+            const clockwiseDiff = (dir2 - dir1 + 360) % 360;
+            const counterClockwiseDiff = (dir1 - dir2 + 360) % 360;
             return Math.min(clockwiseDiff, counterClockwiseDiff);
         }
 
@@ -1096,25 +1068,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             return winners;
         }
 
-        // const dedupeSlackIndices = (indices) => {
-        //     const deduped = [];
-        //     indices.forEach((index) => {
-        //         if (deduped.length === 0) {
-        //             deduped.push(index);
-        //             return;
-        //         }
-        //         const previousIndex = deduped[deduped.length - 1];
-        //         if (
-        //             index === previousIndex + 1 &&
-        //             approximatelyEqual(currentMeasurements[index].speed, currentMeasurements[previousIndex].speed)
-        //         ) {
-        //             return;
-        //         }
-        //         deduped.push(index);
-        //     });
-        //     return deduped;
-        // };
-
         //const slackIndices = dedupeSlackIndices(Array.from(slackIndicesCandidates).sort((a, b) => a - b));
         const slackTides = filterSlackTideCandidates(Array.from(slackTideCandidates).sort((a, b) => a - b));
 
@@ -1275,7 +1228,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         });
 
         // Generate visual timeline bars for each diving window
-        previousDate = null; // Track previous date to avoid duplicate date labels
+        let previousDate = null; // Track previous date to avoid duplicate date labels
         windows.forEach(window => {
             // Create main container for this timeline row
             const timelineRow = document.createElement('div');
@@ -1442,10 +1395,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 }
                 
                 // Mark first visible segment
-                if (isFirstVisible && fillerDuration === 0) {
-                    segmentDiv.classList.add('first-visible');
-                    isFirstVisible = false;
-                } else if (isFirstVisible) {
+                if (isFirstVisible) {
                     segmentDiv.classList.add('first-visible');
                     isFirstVisible = false;
                 }
@@ -1799,7 +1749,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
  */
 function UTCToLocal(utcstring) {
     // Ensure timestamp has proper milliseconds format for Date constructor
-    utcISOString = utcstring.replace(':00Z',':00.000Z');
+    const utcISOString = utcstring.replace(':00Z',':00.000Z');
     var strUTC = ( new Date(utcISOString) ).toISOString();
     var datetimeLocal = new Date( strUTC );
 
@@ -1852,9 +1802,9 @@ function formatDateLabel(timestamp) {
  */
 function LocalToUTC(localstring) {
     // Convert local time to UTC ISO string
-    var strUTC = ( new Date(localstring) ).toISOString();
+    const strUTC = ( new Date(localstring) ).toISOString();
     // Format for RWS API (remove milliseconds, use Z suffix)
-    strUTCFormatted = strUTC.replace(':00.000Z',':00Z');
+    const strUTCFormatted = strUTC.replace(':00.000Z',':00Z');
     return strUTCFormatted; 
 }
 
@@ -1962,6 +1912,8 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
     const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
     const hasBeginner = beginnerWindow.startTime && beginnerWindow.endTime;
     const hasSlack = windowData.slackTime && windowData.slackTime.timeStamp;
+    let slackTimeText = 'n.v.t.';
+    let slackIndicatoeText = 'n.v.t.';
 
     if (rowMoonPhase || hasAdvanced || hasBeginner || hasSlack) {
         const extraInfo = document.createElement('div');
@@ -2031,8 +1983,8 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
         }
         if (hasSlack) {
             slackTimeText = windowData.slackTime.timeStamp ? formatTime(windowData.slackTime.timeStamp) : 'n.v.t.';
-            slackPeakText = windowData.tideIndicator ? `${windowData.tideIndicator}` : 'n.v.t.';
-            extraInfoTable.appendChild(createInfoRow('Kentering', slackPeakText, slackTimeText));
+            slackIndicatorText = windowData.tideIndicator ? `${windowData.tideIndicator}` : 'n.v.t.';
+            extraInfoTable.appendChild(createInfoRow('Kentering', slackIndicatorText, slackTimeText));
         }
 
         extraInfo.appendChild(extraInfoTable);
@@ -2077,14 +2029,14 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
             const value = Math.round(item.speed * 100);
             const band = getBand(value);
             // make sure there are no gaps in the chart when transitioning between bands by adding a point at the boundary threshold
-            nextBand  = null;
+            let nextBand  = null;
             if (index !== windowData.measurements.length - 1) {
                 const nextItem = windowData.measurements[index + 1];
                 const nextValue = Math.round(nextItem.speed * 100);
                 nextBand  = getBand(nextValue)
             }
 
-            previousBand  = null;
+            let previousBand  = null;
             if (index !== 0) {
                 const previousItem = windowData.measurements[index - 1];
                 const previousValue = Math.round(previousItem.speed * 100);
@@ -2210,7 +2162,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
                                 xScaleID: 'x',   // add this — tells the plugin which axis to resolve xValue against
                                 xValue: slackTideIndex !== -1 ? labels[slackTideIndex] : null,
                                 yValue: slackTideIndex !== -1 ? Math.round(windowData.slackTime.speed * 100) : 0,
-                                content: slackTideIndex !== -1 ? [`${slackPeakText} ${slackTideTime}`] : [],
+                                content: slackTideIndex !== -1 ? [`${slackIndicatorText} ${slackTideTime}`] : [],
                                 //backgroundColor: 'rgba(0, 102, 0, 0.8)',
                                 color: '#81bd81',
                                 font: {
