@@ -661,9 +661,18 @@ th {
     flex-shrink: 0;
 }
 
-.legend-chevron {
+.legend-toggle .legend-chevron {
     transition: transform 0.3s ease;
-    margin-right: 5px;
+    margin-right: 5px !important;
+    display: inline-flex !important;
+    width: 1.2em !important;
+    height: 1.2em !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transform-origin: 50% 50% !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    text-align: center !important;
 }
 
 .legend-toggle[aria-expanded="true"] .legend-chevron,
