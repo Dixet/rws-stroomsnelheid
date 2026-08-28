@@ -54,6 +54,62 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+
+/**
+ * Initialize loading spinner with dynamic rotating messages
+ */
+function initLoadingSpinner() {
+    const loadingTextElement = document.querySelector('.loading-text');
+    if (!loadingTextElement) return;
+
+    // Define the list of loading messages
+    const loadingMessages = [
+        'Getijden aan het narekenen',
+        'Stroming aan het peilen',
+        'Duikvensters aan het openen',
+        'Kentering aan het berekenen',
+        'Onderstromen aan het opsporen',
+        'Stekken aan het scannen',
+        'Zicht aan het inschatten',
+        'Stromingssnelheid aan het meten',
+        'Op zoek naar rustig water',
+        'Maanstanden aan het raadplegen'
+    ];
+
+    let currentIndex = 0;
+    let intervalId = null;
+
+    // Function to cycle through messages
+    function cycleMessage() {
+        currentIndex = (currentIndex + 1) % loadingMessages.length;
+        loadingTextElement.textContent = loadingMessages[currentIndex];
+    }
+
+    // Function to start cycling messages
+    function startCycling() {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(cycleMessage, 2000);
+        // Set initial random message immediately
+        currentIndex = Math.floor(Math.random() * loadingMessages.length);
+        loadingTextElement.textContent = loadingMessages[currentIndex];
+    }
+
+    // Function to stop cycling messages
+    function stopCycling() {
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+    }
+
+    // Store references on the loading spinner element for easy access
+    const loadingSpinnerElement = loadingTextElement.parentElement;
+    if (loadingSpinnerElement) {
+        loadingSpinnerElement._startLoadingTextCycle = startCycling;
+        loadingSpinnerElement._stopLoadingTextCycle = stopCycling;
+    }
+}
+
 // Initialize legend state on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
     const legendToggle = document.querySelector('.legend-toggle');
@@ -65,6 +121,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize time range toggle functionality
     initTimeRangeToggle();
+    
+    // Initialize loading spinner with dynamic text
+    initLoadingSpinner();
 });
 
 /**
@@ -84,6 +143,8 @@ function initTimeRangeToggle() {
     updateDatetimeFieldsVisibility();
 
     // Add event listeners to both buttons
+
+
     vandaagMorgenBtn.addEventListener('click', function() {
         // Switch to Vandaag en morgen
         vandaagMorgenBtn.classList.add('active');
@@ -798,6 +859,11 @@ async function fetchData() {
     // Hide legend and show loading spinner to indicate data is being fetched
     legend.style.display = 'none';
     loadingSpinner.style.display = 'block';
+    
+    // Start cycling loading text
+    if (loadingSpinner._startLoadingTextCycle) {
+        loadingSpinner._startLoadingTextCycle();
+    }
 
     // Extract form values for API request parameters
     const startDate = document.getElementById('startDate').value;
@@ -813,6 +879,9 @@ async function fetchData() {
     const endDateTime = new Date(`${endDate}T${endTime}:00`);
     if (endDateTime < startDateTime) {
         loadingSpinner.style.display = 'none';
+        if (loadingSpinner._stopLoadingTextCycle) {
+            loadingSpinner._stopLoadingTextCycle();
+        }
         resultsContainer.textContent = 'Einddatum/tijd kan niet vóór startdatum/tijd liggen.';
         return;
     }
@@ -885,8 +954,11 @@ async function fetchData() {
         
         diveWindowsContainer.appendChild(errorElement);
     } finally {
-        // Always hide loading spinner when done, regardless of success or failure
+        // Always hide loading spinner and stop text cycling when done, regardless of success or failure
         loadingSpinner.style.display = 'none';
+        if (loadingSpinner._stopLoadingTextCycle) {
+            loadingSpinner._stopLoadingTextCycle();
+        }
     }
 }
 
