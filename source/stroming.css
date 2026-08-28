@@ -661,15 +661,31 @@ th {
     flex-shrink: 0;
 }
 
+.legend-chevron {
+    transition: transform 0.3s ease;
+    margin-right: 5px;
+}
+
+.legend-toggle[aria-expanded="true"] .legend-chevron,
 .legend-toggle[aria-expanded="true"] svg {
+    transform: rotate(90deg);
+}
+
+.legend-toggle[aria-expanded="false"] .legend-chevron,
+.legend-toggle[aria-expanded="false"] svg {
+    transform: rotate(0deg);
+}
+
+.legend-toggle[aria-expanded="true"] .legend-chevron {
     transform: rotate(90deg);
     transition: transform 0.3s ease;
 }
 
-.legend-toggle[aria-expanded="false"] svg {
+.legend-toggle[aria-expanded="false"] .legend-chevron {
     transform: rotate(0deg);
     transition: transform 0.3s ease;
 }
+
 
 .legend-content {
     display: none;

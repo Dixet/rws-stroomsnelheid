@@ -27,28 +27,42 @@ window.addEventListener('click', function(event) {
     }
 });
 
-// Legend toggle functionality
-function setupLegendToggle() {
+// Legend toggle functionality using event delegation
+function handleLegendToggle(e) {
+    const legendToggle = e.target.closest ? e.target.closest('.legend-toggle') : null;
+    if (!legendToggle) return;
+    
+    const legendContent = document.getElementById('legend-content');
+    if (!legendContent) return;
+    
+    const isExpanded = legendToggle.getAttribute('aria-expanded') === 'true';
+    legendToggle.setAttribute('aria-expanded', String(!isExpanded));
+    legendContent.classList.toggle('expanded', !isExpanded);
+}
+
+// Use event delegation for legend toggle (works even if legend is re-rendered)
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.legend-toggle')) {
+        handleLegendToggle(e);
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement.closest('.legend-toggle')) {
+        e.preventDefault();
+        handleLegendToggle({ target: document.activeElement });
+    }
+});
+
+// Initialize legend state on DOM ready
+document.addEventListener('DOMContentLoaded', function() {
     const legendToggle = document.querySelector('.legend-toggle');
     const legendContent = document.getElementById('legend-content');
-    if (!legendToggle || !legendContent) return;
-    legendToggle.setAttribute('aria-expanded', 'false');
-    legendContent.classList.remove('expanded');
-    legendToggle.addEventListener('click', function() {
-        const isExpanded = this.getAttribute('aria-expanded') === 'true';
-        this.setAttribute('aria-expanded', String(!isExpanded));
-        legendContent.classList.toggle('expanded', !isExpanded);
-    });
-    legendToggle.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            const isExpanded = this.getAttribute('aria-expanded') === 'true';
-            this.setAttribute('aria-expanded', String(!isExpanded));
-            legendContent.classList.toggle('expanded', !isExpanded);
-        }
-    });
-}
-document.addEventListener('DOMContentLoaded', setupLegendToggle);
+    if (legendToggle && legendContent) {
+        legendToggle.setAttribute('aria-expanded', 'false');
+        legendContent.classList.remove('expanded');
+    }
+});
 
 /**
  * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
@@ -1766,8 +1780,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             if (legendToggle && legendContent) {
                 legendToggle.setAttribute('aria-expanded', 'false');
                 legendContent.classList.remove('expanded');
-                // Re-attach event listeners in case legend was re-rendered
-                setupLegendToggle();
             }
         }
     } else {
