@@ -119,6 +119,9 @@ form {
     display: flex;
     flex-direction: column;
 }
+.time-range-group {
+    flex: none;
+}
 label {
     font-weight: bold;
     margin-bottom: 5px;
@@ -140,6 +143,53 @@ label {
 }
 .checkbox-inline input[type="checkbox"] {
     margin: 0;
+}
+.hidden {
+    display: none !important;
+}
+.datetime-fields {
+    margin-top: 10px;
+}
+
+/* Segmented Control Styles */
+.segmented-control {
+    display: inline-flex;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #f1f3f4;
+    border: 1px solid #dee2e6;
+    margin-top: 10px;
+    width: fit-content;
+}
+
+.segmented-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+    font-size: 0.95em;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.segmented-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.segmented-btn.active {
+    background-color: #3498db;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.segmented-btn i.ti {
+    font-size: 1.1em;
+    vertical-align: middle;
 }
 input[type="date"], input[type="time"], select {
     padding: 10px;

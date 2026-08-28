@@ -62,7 +62,66 @@ document.addEventListener('DOMContentLoaded', function() {
         legendToggle.setAttribute('aria-expanded', 'false');
         legendContent.classList.remove('expanded');
     }
+    
+    // Initialize time range toggle functionality
+    initTimeRangeToggle();
 });
+
+/**
+ * Initialize and handle the time range toggle functionality.
+ * When "Terugkijken" is selected, show datetime fields. When "Vandaag en morgen" is selected, hide them and reset to defaults.
+ */
+function initTimeRangeToggle() {
+    const vandaagMorgenBtn = document.getElementById('vandaagMorgen');
+    const terugkijkenBtn = document.getElementById('terugkijken');
+    const datetimeFields = document.getElementById('datetimeFields');
+
+    if (!vandaagMorgenBtn || !terugkijkenBtn || !datetimeFields) {
+        return;
+    }
+
+    // Set initial state
+    updateDatetimeFieldsVisibility();
+
+    // Add event listeners to both buttons
+    vandaagMorgenBtn.addEventListener('click', function() {
+        // Switch to Vandaag en morgen
+        vandaagMorgenBtn.classList.add('active');
+        terugkijkenBtn.classList.remove('active');
+        
+        // Reset to default values when Vandaag en morgen is selected
+        setDefaultDateTime();
+        updateDatetimeFieldsVisibility();
+    });
+
+    terugkijkenBtn.addEventListener('click', function() {
+        // Switch to Terugkijken
+        terugkijkenBtn.classList.add('active');
+        vandaagMorgenBtn.classList.remove('active');
+        
+        updateDatetimeFieldsVisibility();
+    });
+}
+
+/**
+ * Update the visibility of datetime fields based on the selected time range mode.
+ */
+function updateDatetimeFieldsVisibility() {
+    const terugkijkenBtn = document.getElementById('terugkijken');
+    const datetimeFields = document.getElementById('datetimeFields');
+
+    if (!terugkijkenBtn || !datetimeFields) {
+        return;
+    }
+
+    if (terugkijkenBtn.classList.contains('active')) {
+        // Show datetime fields for Terugkijken
+        datetimeFields.classList.remove('hidden');
+    } else {
+        // Hide datetime fields for Vandaag en morgen
+        datetimeFields.classList.add('hidden');
+    }
+}
 
 /**
  * Returns the maximum allowed end date string (YYYY-MM-DD) given the selected start date.
