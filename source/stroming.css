@@ -9,13 +9,15 @@ body {
 
 .help-icon {
     position: absolute;
-    top: 50px;
-    right: 20px;
+    right: 0;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 5px;
-    z-index: 1000;
+    padding: 0;
+    margin-left: 10px;
+    display: inline-flex;
+    align-items: center;
+    top: 0;
 }
 
 .help-icon svg {
@@ -25,6 +27,13 @@ body {
 
 .help-icon:hover svg {
     color: #3498db;
+}
+
+h1 {
+    position: relative;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 2em;
 }
 
 .info-popup {
@@ -62,11 +71,6 @@ body {
     color: #3498db;
 }
 /* Form styling */
-h1 {
-    color: #2c3e50;
-    margin-bottom: 30px;
-    font-size: 2em;
-}
 form {
     background-color: white;
     padding: 25px;
