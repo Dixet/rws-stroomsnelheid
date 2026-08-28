@@ -28,6 +28,8 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""
     />
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -48,6 +50,7 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
         integrity="sha384-JD1I1oSYdjlw8850MjNFhpmRtgBZ97SjJYg9IJUE1RxR3DgG8oo4R43qLGMkd99t"
         crossorigin="anonymous">
     </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <script src="stroming.js?v=9" defer></script>
     <link rel="stylesheet" href="stroming.css?v=9">
 </head>
@@ -95,23 +98,39 @@ See: https://github.com/Dixet/rws-stroomsnelheid?tab=GPL-3.0-1-ov-file
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="startDate" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Startdatum:</label>
-                    <input type="date" id="startDate" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
-                </div>
-                <div class="form-group">
-                    <label for="startTime" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Starttijd:</label>
-                    <input type="time" id="startTime" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                <div class="form-group time-range-group">
+                    <div class="segmented-control" id="timeRangeToggle">
+                        <button type="button" class="segmented-btn active" id="vandaagMorgen" data-value="vandaag-morgen">
+                            <i class="ti ti-calendar-event"></i>
+                            <span>Vandaag en morgen</span>
+                        </button>
+                        <button type="button" class="segmented-btn" id="terugkijken" data-value="terugkijken">
+                            <i class="ti ti-history"></i>
+                            <span>Terugkijken</span>
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="endDate" title="Kies een einddatum tot 3 dagen na de startdatum">Einddatum:</label>
-                    <input type="date" id="endDate" required title="Kies een einddatum tot 3 dagen na de startdatum">
+            <div id="datetimeFields" class="datetime-fields hidden">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="startDate" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Startdatum:</label>
+                        <input type="date" id="startDate" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                    </div>
+                    <div class="form-group">
+                        <label for="startTime" title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Starttijd:</label>
+                        <input type="time" id="startTime" required title="Vanaf wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="endTime" title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Eindtijd:</label>
-                    <input type="time" id="endTime" required title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="endDate" title="Kies een einddatum tot 3 dagen na de startdatum">Einddatum:</label>
+                        <input type="date" id="endDate" required title="Kies een einddatum tot 3 dagen na de startdatum">
+                    </div>
+                    <div class="form-group">
+                        <label for="endTime" title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">Eindtijd:</label>
+                        <input type="time" id="endTime" required title="Tot wanneer wilt u stromingsinformatie zien? RWS voorspelt tot maximaal 40 uur vooruit">
+                    </div>
                 </div>
             </div>
             <button type="submit" id="fetchDataButton">Toon duikvensters</button>
