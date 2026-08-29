@@ -907,42 +907,37 @@ async function fetchData() {
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
-        const r = {};
-        r.method = "GET";
-        let response_speed, response_direction, response_hoogte;
-        try {
-            response_speed = await fetch(new Request(url_speed, r));
-            response_direction = await fetch(new Request(url_direction, r));
-            response_hoogte = await fetch(new Request(url_hoogte, r));
-        } catch (fetchError) {
-            // Network-level errors (CORS, DNS, etc.) - these don't return a response object
-            throw new Error(`Netwerkfout: ${fetchError.message}`);
-        }
-        
-        // Check both responses for errors
-        let errorMessage = null;
-        if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
-            const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
-            const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
-            const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
-            errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
-            throw new Error(errorMessage);
-        }
-        
-        const data_speed = await response_speed.json();
-        const data_direction = await response_direction.json();
-        const data_hoogte = await response_hoogte.json();
-        
-        // Process and display the fetched data
-        displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
-        
-        // Scroll to dive windows section after displaying results (especially useful on mobile)
-        setTimeout(() => {
-            const diveWindowsElement = document.getElementById('dive-windows');
-            if (diveWindowsElement && diveWindowsElement.hasChildNodes()) {
-                diveWindowsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const r = {method: "GET"};
+            const [response_speed, response_direction, response_hoogte] = await Promise.all([
+                fetch(new Request(url_speed, r)),
+                fetch(new Request(url_direction, r)),
+                fetch(new Request(url_hoogte, r))
+            ]);
+
+            // Check both responses for errors
+            let errorMessage = null;
+            if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
+                const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
+                const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
+                const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
+                errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
+                throw new Error(errorMessage);
             }
-        }, 100);
+            
+            const data_speed = await response_speed.json();
+            const data_direction = await response_direction.json();
+            const data_hoogte = await response_hoogte.json();
+            
+            // Process and display the fetched data
+            displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
+            
+            // Scroll to dive windows section after displaying results (especially useful on mobile)
+            setTimeout(() => {
+                const diveWindowsElement = document.getElementById('dive-windows');
+                if (diveWindowsElement && diveWindowsElement.hasChildNodes()) {
+                    diveWindowsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
     } catch (error) {
         // Handle network errors, API errors, or JSON parsing errors
         console.error('Error fetching data:', error);
