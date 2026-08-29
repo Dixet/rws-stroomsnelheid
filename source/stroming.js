@@ -1087,7 +1087,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             let bestPeakIndex = -1;
             let bestPeakSpeed = -Infinity;
             for (let i = startIndex; i <= endIndex; i++) {
-                if (isLocalPeak(i)) {
+                if (currentMeasurements[i].isLocalPeak) {
                     const speed = currentMeasurements[i].speed;
                     if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && i > bestPeakIndex)) {
                         bestPeakSpeed = speed;
@@ -1115,7 +1115,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             let bestPeakIndex = -1;
             let bestPeakSpeed = -Infinity;
             for (let i = startIndex; i <= endIndex; i++) {
-                if (isLocalPeak(i)) {
+                if (currentMeasurements[i].isLocalPeak) {
                     const speed = currentMeasurements[i].speed;
                     if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && (bestPeakIndex === -1 || i < bestPeakIndex))) {
                         bestPeakSpeed = speed;
@@ -1481,8 +1481,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
             // Create segments based on current speed thresholds
             // Get indices for window start and end
-            const windowStartIndex = currentMeasurements.findIndex(m => m === window.windowStart);
-            const windowEndIndex = currentMeasurements.findIndex(m => m === window.windowEnd);
+            const windowStartIndex = window.windowStartIndex;
+            const windowEndIndex = window.windowEndIndex;
             
             // Analyze the current data to create color-coded segments
             let currentSegmentStart = windowStartIndex;
