@@ -649,47 +649,46 @@ async function getMoonPhasesInRange(startDate, endDate) {
     return filtered;
 }
 
-/* 
- * Adds moon phase information to each event in the API result based on the event's local date.
+// Module-level constants — no need to recreate these objects on every call
+const MOON_PHASE_TRANSLATIONS = {
+    'New Moon': 'Nieuwe Maan',
+    'First Quarter': 'Eerste kwartier',
+    'Full Moon': 'Volle Maan',
+    'Last Quarter': 'Laatste kwartier',
+    'Springtij': 'Springtij',
+    'Dood tij': 'Dood tij'
+};
+const MOON_PHASE_ICONS = {
+    'New Moon': 'images/newmoon.png',
+    'First Quarter': 'images/firstquarter.png',
+    'Full Moon': 'images/fullmoon.png',
+    'Last Quarter': 'images/lastquarter.png',
+    'Springtij': 'images/springtide.png',
+    'Dood tij': 'images/neaptide.png'
+};
+
+/*
+ * Builds a lookup map (local date string -> phase name) from a moonPhases array.
+ * Call this ONCE per moonPhases array, not once per lookup.
  */
-function GetMoonPhaseForDate(timeStamp, moonPhases) {
-    // Build a lookup: local date string -> phase name, for fast matching
-
-    // Dutch translation of moon phases
-    const moonPhaseTranslations = {
-        'New Moon': 'Nieuwe Maan',
-        'First Quarter': 'Eerste kwartier',
-        'Full Moon': 'Volle Maan',
-        'Last Quarter': 'Laatste kwartier',
-        'Springtij': 'Springtij',
-        'Dood tij': 'Dood tij'
-    };
-    const moonPhaseIcons = {
-        'New Moon': 'images/newmoon.png',
-        'First Quarter': 'images/firstquarter.png',
-        'Full Moon': 'images/fullmoon.png',
-        'Last Quarter': 'images/lastquarter.png',
-        'Springtij': 'images/springtide.png',
-        'Dood tij': 'images/neaptide.png'
-    };
-
-    
-    
+function buildMoonPhaseDateMap(moonPhases) {
     const phaseByDate = new Map();
     moonPhases.forEach(mp => {
         phaseByDate.set(mp.date.toDateString(), mp.phase);
     });
+    return phaseByDate;
+}
+
+/* 
+ * Looks up moon phase info for a given timestamp using a prebuilt phaseByDate map.
+ */
+function GetMoonPhaseForDate(timeStamp, phaseByDate) {
     const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
     const key = eventDate.toDateString();
-    let moonPhase = null;
-    let moonPhaseIcon = null;
     if (phaseByDate.has(key)) {
-        moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
-        moonPhaseIcon = moonPhaseIcons[phaseByDate.get(key)];
-        return { name: moonPhase, icon: moonPhaseIcon };
+        const phase = phaseByDate.get(key);
+        return { name: MOON_PHASE_TRANSLATIONS[phase], icon: MOON_PHASE_ICONS[phase] };
     }
-
-    
 }
 
 /**
@@ -1401,12 +1400,13 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         // Generate visual timeline bars for each diving window
         let previousDate = null; // Track previous date to avoid duplicate date labels
+        const phaseByDate = buildMoonPhaseDateMap(moonphases); // build once, reuse for every window
         windows.forEach(window => {
             // Create main container for this timeline row
             const timelineRow = document.createElement('div');
             timelineRow.className = 'timeline-row';
             
-            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
+            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, phaseByDate);
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 timelineRow.classList.add('has-date-label'); // extra ruimte alleen op deze rij
@@ -2086,7 +2086,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
     const content = document.createElement('div');
     content.className = 'popup-card-content';
 
-    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, moonphases);
+    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, buildMoonPhaseDateMap(moonphases));
     const advancedWindow = windowData.advancedWindow || {};
     const beginnerWindow = windowData.beginnerWindow || {};
     const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
