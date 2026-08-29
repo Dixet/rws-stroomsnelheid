@@ -566,11 +566,15 @@ function renderDiveSites() {
  * Gets moon phase data for the specified year from the USNO API 
  *and returns an array of objects with phase and local date. 
 */
-async function getMoonPhases(year) {
+// module-level cache
+const moonPhaseCache = new Map();
+async function getMoonPhases(year, signal) {
+    if (moonPhaseCache.has(year)) return moonPhaseCache.get(year);
+    // ...existing fetch logic...
     const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
 
     try {
-        const response = await fetch(moonphaseUrl);
+        const response = await fetch(moonphaseUrl, { signal });
 
         if (!response.ok) {
             const errorText = response.statusText || 'Unknown error';
@@ -607,7 +611,7 @@ async function getMoonPhases(year) {
                     date: tideDate
                 });
             });
-
+            moonPhaseCache.set(year, result);
             return result;
     } catch (error) {
         console.error('Error fetching moon phase data:', error);
@@ -619,7 +623,7 @@ async function getMoonPhases(year) {
  * Fetches moon phase data for all years in the specified date range and returns a
  * merged, sorted array.
 */
-async function getMoonPhasesInRange(startDate, endDate) {
+async function getMoonPhasesInRange(startDate, endDate, signal) {
     const startYear = startDate.getFullYear();
     const endYear = endDate.getFullYear();
 
@@ -630,7 +634,7 @@ async function getMoonPhasesInRange(startDate, endDate) {
     }
 
     // Fetch all years in parallel rather than one-by-one
-    const results = await Promise.all(years.map(year => getMoonPhases(year)));
+    const results = await Promise.all(years.map(year => getMoonPhases(year, signal)));
 
     // Flatten the array-of-arrays into one array
     const merged = results.flat();
@@ -645,47 +649,46 @@ async function getMoonPhasesInRange(startDate, endDate) {
     return filtered;
 }
 
-/* 
- * Adds moon phase information to each event in the API result based on the event's local date.
+// Module-level constants — no need to recreate these objects on every call
+const MOON_PHASE_TRANSLATIONS = {
+    'New Moon': 'Nieuwe Maan',
+    'First Quarter': 'Eerste kwartier',
+    'Full Moon': 'Volle Maan',
+    'Last Quarter': 'Laatste kwartier',
+    'Springtij': 'Springtij',
+    'Dood tij': 'Dood tij'
+};
+const MOON_PHASE_ICONS = {
+    'New Moon': 'images/newmoon.png',
+    'First Quarter': 'images/firstquarter.png',
+    'Full Moon': 'images/fullmoon.png',
+    'Last Quarter': 'images/lastquarter.png',
+    'Springtij': 'images/springtide.png',
+    'Dood tij': 'images/neaptide.png'
+};
+
+/*
+ * Builds a lookup map (local date string -> phase name) from a moonPhases array.
+ * Call this ONCE per moonPhases array, not once per lookup.
  */
-function GetMoonPhaseForDate(timeStamp, moonPhases) {
-    // Build a lookup: local date string -> phase name, for fast matching
-
-    // Dutch translation of moon phases
-    const moonPhaseTranslations = {
-        'New Moon': 'Nieuwe Maan',
-        'First Quarter': 'Eerste kwartier',
-        'Full Moon': 'Volle Maan',
-        'Last Quarter': 'Laatste kwartier',
-        'Springtij': 'Springtij',
-        'Dood tij': 'Dood tij'
-    };
-    const moonPhaseIcons = {
-        'New Moon': 'images/newmoon.png',
-        'First Quarter': 'images/firstquarter.png',
-        'Full Moon': 'images/fullmoon.png',
-        'Last Quarter': 'images/lastquarter.png',
-        'Springtij': 'images/springtide.png',
-        'Dood tij': 'images/neaptide.png'
-    };
-
-    
-    
+function buildMoonPhaseDateMap(moonPhases) {
     const phaseByDate = new Map();
     moonPhases.forEach(mp => {
         phaseByDate.set(mp.date.toDateString(), mp.phase);
     });
+    return phaseByDate;
+}
+
+/* 
+ * Looks up moon phase info for a given timestamp using a prebuilt phaseByDate map.
+ */
+function GetMoonPhaseForDate(timeStamp, phaseByDate) {
     const eventDate = new Date(timeStamp); // parses ISO UTC string into local-aware Date
     const key = eventDate.toDateString();
-    let moonPhase = null;
-    let moonPhaseIcon = null;
     if (phaseByDate.has(key)) {
-        moonPhase = moonPhaseTranslations[phaseByDate.get(key)];
-        moonPhaseIcon = moonPhaseIcons[phaseByDate.get(key)];
-        return { name: moonPhase, icon: moonPhaseIcon };
+        const phase = phaseByDate.get(key);
+        return { name: MOON_PHASE_TRANSLATIONS[phase], icon: MOON_PHASE_ICONS[phase] };
     }
-
-    
 }
 
 /**
@@ -834,12 +837,23 @@ function getWindDirection(degrees) {
     return { direction: directions[Math.round(degrees / 45) % 8], arrow: directionArrows[Math.round(degrees / 45) % 8] };
 }
 
+// Tracks the in-flight request so a new fetchData() call can cancel the previous one
+let currentFetchController = null;
 /**
  * Main function to fetch water current data from Rijkswaterstaat API and display results.
  * Retrieves both current speed and direction data for the selected dive site and time range.
  * Handles UI state management (loading spinner, clearing previous results) and error handling.
  */
 async function fetchData() {
+    // Cancel any previous request that's still in flight, so a stale response
+    // can't overwrite newer results if the user presses the button again quickly
+    if (currentFetchController) {
+        currentFetchController.abort();
+    }
+    currentFetchController = new AbortController();
+    const { signal } = currentFetchController;
+
+    
     // Clear containers immediately when button is pressed to provide immediate user feedback
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
@@ -887,8 +901,6 @@ async function fetchData() {
     }
 
     // Get the moon phases for the selected date range to display in the results
-    const moonphases = await getMoonPhasesInRange(startDateTime, endDateTime);
-    // Construct ISO datetime strings from separate date and time inputs
     // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
     const localStartDateTimeString = `${startDate}T${startTime}:00`;
     const localEndDateTimeString = `${endDate}T${endTime}:00`;
@@ -907,18 +919,17 @@ async function fetchData() {
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
+        const moonphasesPromise = getMoonPhasesInRange(startDateTime, endDateTime, signal);
         const r = {};
         r.method = "GET";
-        let response_speed, response_direction, response_hoogte;
-        try {
-            response_speed = await fetch(new Request(url_speed, r));
-            response_direction = await fetch(new Request(url_direction, r));
-            response_hoogte = await fetch(new Request(url_hoogte, r));
-        } catch (fetchError) {
-            // Network-level errors (CORS, DNS, etc.) - these don't return a response object
-            throw new Error(`Netwerkfout: ${fetchError.message}`);
-        }
-        
+        r.signal = signal;
+        const [response_speed, response_direction, response_hoogte] = await Promise.all([
+            fetch(new Request(url_speed, r)),
+            fetch(new Request(url_direction, r)),
+            fetch(new Request(url_hoogte, r))
+        ]);
+        const moonphases = await moonphasesPromise; // already resolved or resolves almost immediately    // Construct ISO datetime strings from separate date and time inputs
+
         // Check both responses for errors
         let errorMessage = null;
         if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
@@ -954,10 +965,15 @@ async function fetchData() {
         
         diveWindowsContainer.appendChild(errorElement);
     } finally {
-        // Always hide loading spinner and stop text cycling when done, regardless of success or failure
-        loadingSpinner.style.display = 'none';
-        if (loadingSpinner._stopLoadingTextCycle) {
-            loadingSpinner._stopLoadingTextCycle();
+       // Only touch the UI if this call's controller is still the "current" one —
+        // otherwise a superseded request would hide the newer request's spinner
+        if (currentFetchController.signal === signal) {
+
+            // Always hide loading spinner and stop text cycling when done, regardless of success or failure
+            loadingSpinner.style.display = 'none';
+            if (loadingSpinner._stopLoadingTextCycle) {
+                loadingSpinner._stopLoadingTextCycle();
+            }
         }
     }
 }
@@ -1031,6 +1047,11 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             )
             .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
+            // Lookup map: timestamp string -> measurement, so later loops can do O(1) lookups
+            // instead of scanning currentMeasurements with .find() every time.
+            const measurementByTimestamp = new Map(
+                currentMeasurements.map(m => [m.timeStamp, m])
+            );
         /**
          * Calculate the difference in minutes between two timestamp objects
          * @param {Object} start - Event object with timeStamp property
@@ -1088,7 +1109,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             let bestPeakIndex = -1;
             let bestPeakSpeed = -Infinity;
             for (let i = startIndex; i <= endIndex; i++) {
-                if (isLocalPeak(i)) {
+                if (currentMeasurements[i].isLocalPeak) {
                     const speed = currentMeasurements[i].speed;
                     if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && i > bestPeakIndex)) {
                         bestPeakSpeed = speed;
@@ -1116,7 +1137,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             let bestPeakIndex = -1;
             let bestPeakSpeed = -Infinity;
             for (let i = startIndex; i <= endIndex; i++) {
-                if (isLocalPeak(i)) {
+                if (currentMeasurements[i].isLocalPeak) {
                     const speed = currentMeasurements[i].speed;
                     if (speed > bestPeakSpeed + FLOAT_TOLERANCE || (approximatelyEqual(speed, bestPeakSpeed) && (bestPeakIndex === -1 || i < bestPeakIndex))) {
                         bestPeakSpeed = speed;
@@ -1397,12 +1418,13 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         // Generate visual timeline bars for each diving window
         let previousDate = null; // Track previous date to avoid duplicate date labels
+        const phaseByDate = buildMoonPhaseDateMap(moonphases); // build once, reuse for every window
         windows.forEach(window => {
             // Create main container for this timeline row
             const timelineRow = document.createElement('div');
             timelineRow.className = 'timeline-row';
             
-            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, moonphases);
+            const rowMoonPhase = GetMoonPhaseForDate(window.slackTime.timeStamp, phaseByDate);
             const divedate = new Date(window.slackTime.timeStamp);
             if (!previousDate || divedate.toDateString() !== previousDate.toDateString()) {
                 timelineRow.classList.add('has-date-label'); // extra ruimte alleen op deze rij
@@ -1482,8 +1504,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
             // Create segments based on current speed thresholds
             // Get indices for window start and end
-            const windowStartIndex = currentMeasurements.findIndex(m => m === window.windowStart);
-            const windowEndIndex = currentMeasurements.findIndex(m => m === window.windowEnd);
+            const windowStartIndex = window.windowStartIndex;
+            const windowEndIndex = window.windowEndIndex;
             
             // Analyze the current data to create color-coded segments
             let currentSegmentStart = windowStartIndex;
@@ -1655,10 +1677,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                     const segmentStartPosition = cumulativeDuration * pixelsPerMinute;
                     
                     // Find the measurement at this transition point
-                    const segmentStartTime = new Date(segment.startTime);
-                    const transitionMeasurement = currentMeasurements.find(m => 
-                        Math.abs(new Date(m.timeStamp) - segmentStartTime) < 1000 // Within 1 second
-                    );
+                    // Find the measurement at this transition point
+                    const transitionMeasurement = measurementByTimestamp.get(segment.startTime);
                     if (transitionMeasurement) {
                         createLabel(transitionMeasurement, segmentStartPosition, 'transition', labelCount % 2 === 0);
                         labelCount++;
@@ -1783,18 +1803,18 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         // update the width of the date label to match the dive window timeline bar width for better alignment
         const dateLabels = timelineContainer.querySelectorAll('.timeline-date');
         const bars = document.querySelectorAll('.timeline-bar');
-        const maxDateLabelWidth = getMaxElementWidth(bars);
+
+        const maxBarWidth = getMaxElementWidth(bars);
 
         dateLabels.forEach(label => {
-            label.style.width = maxDateLabelWidth + 'px';
+            label.style.width = maxBarWidth  + 'px';
         });
 
         // Alle duikvenster-kaarten dezelfde breedte geven, gebaseerd op de breedste balk
         const cards = timelineContainer.querySelectorAll('.dive-window-card');
-        const maxCardWidth = getMaxElementWidth(bars) + 65; // zelfde marge (25 + 25 + 15) als bij het aanmaken
 
         cards.forEach(card => {
-            card.style.width = maxCardWidth + 'px';
+            card.style.width = (maxBarWidth + 65) + 'px';
         });
 
         // PHASE 3: Create detailed current data table (collapsible section)
@@ -2084,7 +2104,7 @@ function showDiveWindowPopup(windowData, diveSiteName, moonphases) {
     const content = document.createElement('div');
     content.className = 'popup-card-content';
 
-    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, moonphases);
+    const rowMoonPhase = GetMoonPhaseForDate(windowData.slackTime.timeStamp, buildMoonPhaseDateMap(moonphases));
     const advancedWindow = windowData.advancedWindow || {};
     const beginnerWindow = windowData.beginnerWindow || {};
     const hasAdvanced = advancedWindow.startTime && advancedWindow.endTime;
