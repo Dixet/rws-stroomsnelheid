@@ -1785,18 +1785,18 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
         // update the width of the date label to match the dive window timeline bar width for better alignment
         const dateLabels = timelineContainer.querySelectorAll('.timeline-date');
         const bars = document.querySelectorAll('.timeline-bar');
-        const maxDateLabelWidth = getMaxElementWidth(bars);
+
+        const maxBarWidth = getMaxElementWidth(bars);
 
         dateLabels.forEach(label => {
-            label.style.width = maxDateLabelWidth + 'px';
+            label.style.width = maxBarWidth  + 'px';
         });
 
         // Alle duikvenster-kaarten dezelfde breedte geven, gebaseerd op de breedste balk
         const cards = timelineContainer.querySelectorAll('.dive-window-card');
-        const maxCardWidth = getMaxElementWidth(bars) + 65; // zelfde marge (25 + 25 + 15) als bij het aanmaken
 
         cards.forEach(card => {
-            card.style.width = maxCardWidth + 'px';
+            card.style.width = (maxBarWidth + 65) + 'px';
         });
 
         // PHASE 3: Create detailed current data table (collapsible section)
