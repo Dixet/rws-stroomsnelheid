@@ -1030,6 +1030,11 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             )
             .sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
 
+            // Lookup map: timestamp string -> measurement, so later loops can do O(1) lookups
+            // instead of scanning currentMeasurements with .find() every time.
+            const measurementByTimestamp = new Map(
+                currentMeasurements.map(m => [m.timeStamp, m])
+            );
         /**
          * Calculate the difference in minutes between two timestamp objects
          * @param {Object} start - Event object with timeStamp property
@@ -1654,10 +1659,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                     const segmentStartPosition = cumulativeDuration * pixelsPerMinute;
                     
                     // Find the measurement at this transition point
-                    const segmentStartTime = new Date(segment.startTime);
-                    const transitionMeasurement = currentMeasurements.find(m => 
-                        Math.abs(new Date(m.timeStamp) - segmentStartTime) < 1000 // Within 1 second
-                    );
+                    // Find the measurement at this transition point
+                    const transitionMeasurement = measurementByTimestamp.get(segment.startTime);
                     if (transitionMeasurement) {
                         createLabel(transitionMeasurement, segmentStartPosition, 'transition', labelCount % 2 === 0);
                         labelCount++;
