@@ -568,13 +568,13 @@ function renderDiveSites() {
 */
 // module-level cache
 const moonPhaseCache = new Map();
-async function getMoonPhases(year) {
+async function getMoonPhases(year, signal) {
     if (moonPhaseCache.has(year)) return moonPhaseCache.get(year);
     // ...existing fetch logic...
     const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
 
     try {
-        const response = await fetch(moonphaseUrl);
+        const response = await fetch(moonphaseUrl, { signal });
 
         if (!response.ok) {
             const errorText = response.statusText || 'Unknown error';
@@ -623,7 +623,7 @@ async function getMoonPhases(year) {
  * Fetches moon phase data for all years in the specified date range and returns a
  * merged, sorted array.
 */
-async function getMoonPhasesInRange(startDate, endDate) {
+async function getMoonPhasesInRange(startDate, endDate, signal) {
     const startYear = startDate.getFullYear();
     const endYear = endDate.getFullYear();
 
@@ -634,7 +634,7 @@ async function getMoonPhasesInRange(startDate, endDate) {
     }
 
     // Fetch all years in parallel rather than one-by-one
-    const results = await Promise.all(years.map(year => getMoonPhases(year)));
+    const results = await Promise.all(years.map(year => getMoonPhases(year, signal)));
 
     // Flatten the array-of-arrays into one array
     const merged = results.flat();
@@ -837,12 +837,23 @@ function getWindDirection(degrees) {
     return { direction: directions[Math.round(degrees / 45) % 8], arrow: directionArrows[Math.round(degrees / 45) % 8] };
 }
 
+// Tracks the in-flight request so a new fetchData() call can cancel the previous one
+let currentFetchController = null;
 /**
  * Main function to fetch water current data from Rijkswaterstaat API and display results.
  * Retrieves both current speed and direction data for the selected dive site and time range.
  * Handles UI state management (loading spinner, clearing previous results) and error handling.
  */
 async function fetchData() {
+    // Cancel any previous request that's still in flight, so a stale response
+    // can't overwrite newer results if the user presses the button again quickly
+    if (currentFetchController) {
+        currentFetchController.abort();
+    }
+    currentFetchController = new AbortController();
+    const { signal } = currentFetchController;
+
+    
     // Clear containers immediately when button is pressed to provide immediate user feedback
     const diveWindowsContainer = document.getElementById('dive-windows');
     const resultsContainer = document.getElementById('results');
@@ -908,8 +919,10 @@ async function fetchData() {
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
-        const moonphasesPromise = getMoonPhasesInRange(startDateTime, endDateTime);
-        const r = {method: "GET"};
+        const moonphasesPromise = getMoonPhasesInRange(startDateTime, endDateTime, signal);
+        const r = {};
+        r.method = "GET";
+        r.signal = signal;
         const [response_speed, response_direction, response_hoogte] = await Promise.all([
             fetch(new Request(url_speed, r)),
             fetch(new Request(url_direction, r)),
@@ -952,10 +965,15 @@ async function fetchData() {
         
         diveWindowsContainer.appendChild(errorElement);
     } finally {
-        // Always hide loading spinner and stop text cycling when done, regardless of success or failure
-        loadingSpinner.style.display = 'none';
-        if (loadingSpinner._stopLoadingTextCycle) {
-            loadingSpinner._stopLoadingTextCycle();
+       // Only touch the UI if this call's controller is still the "current" one —
+        // otherwise a superseded request would hide the newer request's spinner
+        if (currentFetchController.signal === signal) {
+
+            // Always hide loading spinner and stop text cycling when done, regardless of success or failure
+            loadingSpinner.style.display = 'none';
+            if (loadingSpinner._stopLoadingTextCycle) {
+                loadingSpinner._stopLoadingTextCycle();
+            }
         }
     }
 }
