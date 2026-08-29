@@ -566,7 +566,11 @@ function renderDiveSites() {
  * Gets moon phase data for the specified year from the USNO API 
  *and returns an array of objects with phase and local date. 
 */
+// module-level cache
+const moonPhaseCache = new Map();
 async function getMoonPhases(year) {
+    if (moonPhaseCache.has(year)) return moonPhaseCache.get(year);
+    // ...existing fetch logic...
     const moonphaseUrl = `https://aa.usno.navy.mil/api/moon/phases/year?year=${year}`;
 
     try {
@@ -607,7 +611,7 @@ async function getMoonPhases(year) {
                     date: tideDate
                 });
             });
-
+            moonPhaseCache.set(year, result);
             return result;
     } catch (error) {
         console.error('Error fetching moon phase data:', error);
@@ -887,8 +891,6 @@ async function fetchData() {
     }
 
     // Get the moon phases for the selected date range to display in the results
-    const moonphases = await getMoonPhasesInRange(startDateTime, endDateTime);
-    // Construct ISO datetime strings from separate date and time inputs
     // Format: YYYY-MM-DDTHH:MM:SS (ISO 8601 format)
     const localStartDateTimeString = `${startDate}T${startTime}:00`;
     const localEndDateTimeString = `${endDate}T${endTime}:00`;
@@ -907,37 +909,39 @@ async function fetchData() {
     try {
         // Make parallel API calls to fetch both speed and direction data simultaneously
         // This is more efficient than sequential calls
+        const moonphasesPromise = getMoonPhasesInRange(startDateTime, endDateTime);
         const r = {method: "GET"};
-            const [response_speed, response_direction, response_hoogte] = await Promise.all([
-                fetch(new Request(url_speed, r)),
-                fetch(new Request(url_direction, r)),
-                fetch(new Request(url_hoogte, r))
-            ]);
+        const [response_speed, response_direction, response_hoogte] = await Promise.all([
+            fetch(new Request(url_speed, r)),
+            fetch(new Request(url_direction, r)),
+            fetch(new Request(url_hoogte, r))
+        ]);
+        const moonphases = await moonphasesPromise; // already resolved or resolves almost immediately    // Construct ISO datetime strings from separate date and time inputs
 
-            // Check both responses for errors
-            let errorMessage = null;
-            if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
-                const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
-                const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
-                const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
-                errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
-                throw new Error(errorMessage);
+        // Check both responses for errors
+        let errorMessage = null;
+        if (!response_speed.ok || !response_direction.ok || !response_hoogte.ok) {
+            const speedError = !response_speed.ok ? `Stroomsnelheid API: HTTP ${response_speed.status} ${response_speed.statusText || ''}` : null;
+            const directionError = !response_direction.ok ? `Stromingsrichting API: HTTP ${response_direction.status} ${response_direction.statusText || ''}` : null;
+            const hoogteError = !response_hoogte.ok ? `Waterhoogte API: HTTP ${response_hoogte.status} ${response_hoogte.statusText || ''}` : null;
+            errorMessage = [speedError, directionError, hoogteError].filter(Boolean).join(' | ') || 'Onbekende API-fout';
+            throw new Error(errorMessage);
+        }
+        
+        const data_speed = await response_speed.json();
+        const data_direction = await response_direction.json();
+        const data_hoogte = await response_hoogte.json();
+        
+        // Process and display the fetched data
+        displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
+        
+        // Scroll to dive windows section after displaying results (especially useful on mobile)
+        setTimeout(() => {
+            const diveWindowsElement = document.getElementById('dive-windows');
+            if (diveWindowsElement && diveWindowsElement.hasChildNodes()) {
+                diveWindowsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-            
-            const data_speed = await response_speed.json();
-            const data_direction = await response_direction.json();
-            const data_hoogte = await response_hoogte.json();
-            
-            // Process and display the fetched data
-            displayResults(data_speed, data_direction, data_hoogte, diveSiteName, moonphases);
-            
-            // Scroll to dive windows section after displaying results (especially useful on mobile)
-            setTimeout(() => {
-                const diveWindowsElement = document.getElementById('dive-windows');
-                if (diveWindowsElement && diveWindowsElement.hasChildNodes()) {
-                    diveWindowsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 100);
+        }, 100);
     } catch (error) {
         // Handle network errors, API errors, or JSON parsing errors
         console.error('Error fetching data:', error);
