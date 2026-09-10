@@ -407,7 +407,7 @@ th {
 }
 
 .more-info::after {
-    content: "\ea91"; /* tabler info icon */
+    content: "\eac5"; /* tabler info icon */
     font-family: "tabler-icons" !important;
     font-size: 1.2em;
     font-weight: bold;
