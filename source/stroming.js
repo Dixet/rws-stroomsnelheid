@@ -1789,7 +1789,22 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 eersteKaart.addEventListener('animationend', () => {
                     eersteKaart.classList.remove('tap-hint');
                 }, { once: true });
+
+                // Toon subtiele hinttekst in een ballon die gekoppeld is aan de eerste kaart
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+                const hintText = document.createElement('div');
+                hintText.className = 'map-hint-bubble';
+                hintText.textContent = isTouchDevice ? 'Tik voor meer informatie' : 'Klik voor meer informatie';
+                eersteKaart.appendChild(hintText);
+
+                // Verwijder de hint na dezelfde duur als het knipper-effect (0.8s * 2 = 1.6s)
+                setTimeout(() => {
+                    if (hintText && hintText.parentNode) {
+                        hintText.parentNode.removeChild(hintText);
+                    }
+                }, 1600);
             }
+
             localStorage.setItem('duikvensterHintGetoond', 'true');
         }
 

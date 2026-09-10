@@ -1255,3 +1255,67 @@ th {
     object-fit: contain;
     vertical-align: bottom;
 }
+
+/* Hint bubble for click/tap to show more info */
+.map-hint-bubble {
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #fff;
+    color: #2c3e50;
+    padding: 12px 20px;
+    border-radius: 20px;
+    font-size: 1em;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 3000;
+    border: 2px solid #2c3e50;
+    pointer-events: none;
+    max-width: 80%;
+    text-align: center;
+    line-height: 1.4;
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Hint bubble pointer to the card */
+.map-hint-bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 10px solid transparent;
+    border-top-color: #fff;
+    border-bottom: none;
+}
+
+.map-hint-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 10px solid transparent;
+    border-top-color: #2c3e50;
+    border-bottom: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; top: -60px; }
+    to { opacity: 1; top: -50px; }
+}
+
+@media (max-width: 768px) {
+    .map-hint-bubble {
+        font-size: 0.9em;
+        padding: 10px 16px;
+        border-radius: 16px;
+        top: -45px;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; top: -55px; }
+        to { opacity: 1; top: -45px; }
+    }
+}
