@@ -1782,7 +1782,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
 
         
         // Eenmalige hint-animatie zodat nieuwe bezoekers zien dat duikvensters klikbaar zijn
-        if (!localStorage.getItem('duikvensterHintGetoond')) {
+        if (!localStorage.getItem('MeerInfoHintGetoond')) {
             const eersteKaart = timelineContainer.querySelector('.dive-window-card');
             if (eersteKaart) {
                 eersteKaart.classList.add('tap-hint');
@@ -1805,7 +1805,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 }, 1600);
             }
 
-            localStorage.setItem('duikvensterHintGetoond', 'true');
+            localStorage.setItem('MeerInfoHintGetoond', 'true');
         }
 
         // Add mobile scroll hint for timeline
