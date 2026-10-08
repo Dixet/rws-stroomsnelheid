@@ -1544,8 +1544,30 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 }
             }
 
+            // Find the continuous range of segments that only contains moderate and weak segments
+            // starting from the first moderate segment
             const firstModerateSegment = segments.find(segment => segment.type === 'moderate') || null;
-            const lastModerateSegment = segments.slice().reverse().find(segment => segment.type === 'moderate') || null;
+            let advancedWindowStart = null;
+            let advancedWindowEnd = null;
+            
+            if (firstModerateSegment) {
+                const firstModerateIndex = segments.indexOf(firstModerateSegment);
+                
+                // Find the last consecutive segment that is moderate or weak starting from first moderate
+                let endIndex = firstModerateIndex;
+                while (endIndex < segments.length - 1) {
+                    const nextSegment = segments[endIndex + 1];
+                    if (nextSegment.type === 'moderate' || nextSegment.type === 'weak') {
+                        endIndex++;
+                    } else {
+                        break; // Hit a strong segment, stop
+                    }
+                }
+                
+                advancedWindowStart = segments[firstModerateIndex];
+                advancedWindowEnd = segments[endIndex];
+            }
+            
             const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
             const weakSlackSegment = segments.find(segment => {
                 if (segment.type !== 'weak') {
@@ -1557,8 +1579,8 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             }) || null;
 
             window.advancedWindow = {
-                startTime: firstModerateSegment ? firstModerateSegment.startTime : null,
-                endTime: lastModerateSegment ? lastModerateSegment.endTime : null
+                startTime: advancedWindowStart ? advancedWindowStart.startTime : null,
+                endTime: advancedWindowEnd ? advancedWindowEnd.endTime : null
             };
             window.beginnerWindow = {
                 startTime: weakSlackSegment ? weakSlackSegment.startTime : null,
