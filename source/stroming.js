@@ -1545,14 +1545,56 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
             }
 
             // Find the continuous range of segments that only contains moderate and weak segments
-            // starting from the first moderate segment
-            const firstModerateSegment = segments.find(segment => segment.type === 'moderate') || null;
+            // starting from the first moderate segment that has no strong segments between it and slack tide
+            let weakSlackSegment = null;
+            
+            if (window.slackTime && window.slackTime.timeStamp) {
+                const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
+                weakSlackSegment = segments.find(segment => {
+                    if (segment.type !== 'weak') {
+                        return false;
+                    }
+                    const startMs = new Date(segment.startTime).getTime();
+                    const endMs = new Date(segment.endTime).getTime();
+                    return slackTimeMs >= startMs && slackTimeMs <= endMs;
+                }) || null;
+            }
+            
+            let firstModerateSegment = null;
+            let firstModerateIndex = -1;
+            
+            if (weakSlackSegment) {
+                const weakSlackIndex = segments.indexOf(weakSlackSegment);
+                
+                // Find the first moderate segment that has no strong segments between it and slack tide
+                for (let i = 0; i < segments.length; i++) {
+                    if (segments[i].type === 'moderate') {
+                        // Check if all segments from this moderate to slack tide are moderate or weak
+                        let hasStrongInBetween = false;
+                        for (let j = i; j <= weakSlackIndex; j++) {
+                            if (segments[j].type === 'strong') {
+                                hasStrongInBetween = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!hasStrongInBetween) {
+                            firstModerateSegment = segments[i];
+                            firstModerateIndex = i;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Fallback to original behavior if no slack tide found
+                firstModerateSegment = segments.find(segment => segment.type === 'moderate') || null;
+                firstModerateIndex = firstModerateSegment ? segments.indexOf(firstModerateSegment) : -1;
+            }
+            
             let advancedWindowStart = null;
             let advancedWindowEnd = null;
             
-            if (firstModerateSegment) {
-                const firstModerateIndex = segments.indexOf(firstModerateSegment);
-                
+            if (firstModerateSegment && firstModerateIndex >= 0) {
                 // Find the last consecutive segment that is moderate or weak starting from first moderate
                 let endIndex = firstModerateIndex;
                 while (endIndex < segments.length - 1) {
@@ -1567,16 +1609,6 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 advancedWindowStart = segments[firstModerateIndex];
                 advancedWindowEnd = segments[endIndex];
             }
-            
-            const slackTimeMs = new Date(window.slackTime.timeStamp).getTime();
-            const weakSlackSegment = segments.find(segment => {
-                if (segment.type !== 'weak') {
-                    return false;
-                }
-                const startMs = new Date(segment.startTime).getTime();
-                const endMs = new Date(segment.endTime).getTime();
-                return slackTimeMs >= startMs && slackTimeMs <= endMs;
-            }) || null;
 
             window.advancedWindow = {
                 startTime: advancedWindowStart ? advancedWindowStart.startTime : null,
@@ -1586,7 +1618,7 @@ function displayResults(data_speed, data_direction, data_hoogte, diveSiteName, m
                 startTime: weakSlackSegment ? weakSlackSegment.startTime : null,
                 endTime: weakSlackSegment ? weakSlackSegment.endTime : null
             };
-            
+
             // Create visual segments
             let isFirstVisible = true;
             segments.forEach((segment, index) => {
